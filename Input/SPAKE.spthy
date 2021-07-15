@@ -1,0 +1,63 @@
+theory SPAKE
+begin
+functions:  mul/2,invmul/2,Hash/5
+builtins: diffie-hellman
+equations:  invmul(mul(a,b),a)=b,
+            invmul(mul(a,b),b)=a
+rule Password_init:
+    [ Fr(~pw) ]
+  --[ Init_pw_once() ]->
+    [ !Own(~pw) ]
+rule A_1:
+  let
+    X='g'^~x
+    C1=mul(X,'M'^pw)
+  in
+    [ !Own(pw),Fr(~x) ]
+  --[  ]->
+    [ Out(<$A,C1>),A_1_finish($A,$B,~x,C1,pw) ]
+rule B_1:
+  let
+    Y=('g'^~y)
+    C1=mul(X,'M'^pw)
+    C2=mul(Y,'N'^pw)
+    Kb=X^~y
+    SK_B=Hash($A,$B,C1,C2,Kb)
+  in
+    [ !Own(pw),Fr(~y),In(<$A,C1>) ]
+  --[  ]->
+    [ Out(<$B,C2>),SK_B(SK_B) ]
+rule A_2:
+  let
+  	C2=mul(Y,'N'^pw)
+  	Ka=Y^x
+    SK_A=Hash($A,$B,C1,C2,Ka)
+  in
+    [ In(<$B,C2>),A_1_finish($A,$B,x,C1,pw) ]
+  --[ Finish_A(pw,SK_A) ]->
+    [ SK_A(SK_A) ]
+rule Verif:
+    [ SK_A(SK_A),SK_B(SK_B) ]
+  --[ Eq(SK_A,SK_B),Finish() ]->
+    [  ]
+
+rule Password_guess:
+    [ !Own(pw),Fr(~rc)]
+  --[ Guess_once() ]->
+    [ Out(diff(pw,~rc)) ]
+
+restriction Verif:
+"
+    All x y #i. Eq(x,y) @ i ==> x = y
+"
+
+restriction Init:
+" 
+   All #i #j. Init_pw_once()@i & Init_pw_once()@j ==> #i=#j
+"
+restriction guess:
+" 
+   All #i #j. Guess_once()@i & Guess_once()@j ==> #i=#j
+"
+
+end

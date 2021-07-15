@@ -1,0 +1,56 @@
+theory EKE
+begin
+
+builtins: asymmetric-encryption
+functions: PRF/3,enc/2,dec/2
+rule Password_init:
+    [ Fr(~pw) ]
+  --[ Init_pw_once() ]->
+    [ !Own(~pw) ]
+
+rule Register_pk:
+  [ Fr(~ltkA) ]
+  --[ Register_once() ]->
+  [ !Ltk($A, ~ltkA), 
+    !Pk($A, pk(~ltkA)) ]
+rule A_1:
+    [ !Ltk('A',skA),!Own(pw) ]
+  --[  ]->
+    [ Out(enc(pk(skA),pw)),A_1_done(skA,pw) ]
+
+rule B_1:
+    [ Fr(~r),!Pk('A',pkA),In(enc(pkA,pw)) ]
+  --[  ]->
+    [ Out(enc(aenc(~r,pkA),pw)) ]
+
+rule A_2:
+    [ A_1_done(skA,pw),In(enc(aenc(r,pk(skA)),pw)) ]
+  --[ Finish() ]->
+    [ Finish() ]
+
+rule Password_guess:
+    [ !Own(pw),Fr(~rc) ]
+  --[ Guess_once() ]->
+    [ Out(diff(pw,~rc)) ]
+
+rule dec_dontKnow:
+    [ In(dec(enc(x,y),z)),In(x) ]
+  --[ Eq(y,z) ]->
+    [ Out(x) ]
+restriction Equality:
+  "All x y #i. 
+  (Eq(x,y) @#i ==> x = y)"
+
+restriction Init:
+" 
+   All #i #j. Init_pw_once()@i & Init_pw_once()@j ==> #i=#j
+"
+restriction guess:
+" 
+   All #i #j. Guess_once()@i & Guess_once()@j ==> #i=#j
+"
+restriction Register_once:
+" 
+   All #i #j. Register_once()@i & Register_once()@j ==> #i=#j
+"
+end

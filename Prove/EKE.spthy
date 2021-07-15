@@ -1,0 +1,580 @@
+theory EKE begin
+
+// Function signature and definition of the equational theory E
+
+functions: PRF/3, adec/2, aenc/2, dec/2, enc/2, fst/1, pair/2, pk/1,
+           snd/1
+equations:
+    adec(aenc(x.1, pk(x.2)), x.2) = x.1,
+    fst(<x.1, x.2>) = x.1,
+    snd(<x.1, x.2>) = x.2
+
+
+
+rule (modulo E) Password_init:
+   [ Fr( ~pw ) ] --[ Init_pw_once( ) ]-> [ !Own( ~pw ) ]
+
+rule (modulo E) Register_pk:
+   [ Fr( ~ltkA ) ]
+  --[ Register_once( ) ]->
+   [ !Ltk( $A, ~ltkA ), !Pk( $A, pk(~ltkA) ) ]
+
+rule (modulo E) A_1:
+   [ !Ltk( 'A', skA ), !Own( pw ) ]
+  -->
+   [ Out( enc(pk(skA), pw) ), A_1_done( skA, pw ) ]
+
+rule (modulo E) B_1:
+   [ Fr( ~r ), !Pk( 'A', pkA ), In( enc(pkA, pw) ) ]
+  -->
+   [ Out( enc(aenc(~r, pkA), pw) ) ]
+
+rule (modulo E) A_2:
+   [ A_1_done( skA, pw ), In( enc(aenc(r, pk(skA)), pw) ) ]
+  --[ Finish( ) ]->
+   [ Finish( ) ]
+
+rule (modulo E) Password_guess:
+   [ !Own( pw ), Fr( ~rc ) ] --[ Guess_once( ) ]-> [ Out( diff(pw, ~rc) ) ]
+
+rule (modulo E) dec_dontKnow:
+   [ In( dec(enc(x, y), z) ), In( x ) ] --[ Eq( y, z ) ]-> [ Out( x ) ]
+
+restriction Equality [right]:
+  "∀ x y #i. (Eq( x, y ) @ #i) ⇒ (x = y)"
+  // safety formula
+
+restriction Equality [left]:
+  "∀ x y #i. (Eq( x, y ) @ #i) ⇒ (x = y)"
+  // safety formula
+
+restriction Init [right]:
+  "∀ #i #j. ((Init_pw_once( ) @ #i) ∧ (Init_pw_once( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction Init [left]:
+  "∀ #i #j. ((Init_pw_once( ) @ #i) ∧ (Init_pw_once( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction guess [right]:
+  "∀ #i #j. ((Guess_once( ) @ #i) ∧ (Guess_once( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction guess [left]:
+  "∀ #i #j. ((Guess_once( ) @ #i) ∧ (Guess_once( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction Register_once [right]:
+  "∀ #i #j.
+    ((Register_once( ) @ #i) ∧ (Register_once( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction Register_once [left]:
+  "∀ #i #j.
+    ((Register_once( ) @ #i) ∧ (Register_once( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+/* All well-formedness checks were successful. */
+
+diffLemma Observational_equivalence:
+rule-equivalence
+  case Rule_A_1
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !Ltk( 'A', skA ) ▶₀ #i ) )
+      case Register_pk
+      MIRRORED
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !Ltk( 'A', skA ) ▶₀ #i ) )
+      case Register_pk
+      MIRRORED
+    qed
+  qed
+next
+  case Rule_A_2
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( A_1_done( skA, pw ) ▶₀ #i ) )
+      case A_1
+      step( solve( !KU( enc(aenc(r, pk(~ltkA)), ~pw) ) @ #vk ) )
+        case B_1
+        step( solve( !KU( enc(pk(~ltkA), ~pw) ) @ #vk.1 ) )
+          case A_1
+          MIRRORED
+        next
+          case c_enc
+          step( solve( !KU( ~pw ) @ #vk.3 ) )
+            case Password_guess
+            step( solve( !KU( pk(~ltkA) ) @ #vk.3 ) )
+              case c_pk
+              by step( solve( !KU( ~ltkA ) @ #vk.4 ) )
+            qed
+          qed
+        qed
+      next
+        case c_enc
+        step( solve( !KU( ~pw ) @ #vk.2 ) )
+          case Password_guess
+          step( solve( !KU( aenc(r, pk(~ltkA)) ) @ #vk.2 ) )
+            case c_aenc
+            step( solve( !KU( pk(~ltkA) ) @ #vk.4 ) )
+              case c_pk
+              by step( solve( !KU( ~ltkA ) @ #vk.5 ) )
+            qed
+          qed
+        qed
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( A_1_done( skA, pw ) ▶₀ #i ) )
+      case A_1
+      step( solve( !KU( enc(aenc(r, pk(~ltkA)), ~pw) ) @ #vk ) )
+        case B_1
+        step( solve( !KU( enc(pk(~ltkA), ~pw) ) @ #vk.1 ) )
+          case A_1
+          MIRRORED
+        next
+          case c_enc
+          by step( solve( !KU( ~pw ) @ #vk.3 ) )
+        qed
+      next
+        case c_enc
+        by step( solve( !KU( ~pw ) @ #vk.2 ) )
+      qed
+    qed
+  qed
+next
+  case Rule_B_1
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !Pk( 'A', pkA ) ▶₁ #i ) )
+      case Register_pk
+      step( solve( !KU( enc(pk(~ltkA), pw) ) @ #vk ) )
+        case A_1
+        MIRRORED
+      next
+        case c_enc
+        step( solve( !KU( pk(~ltkA) ) @ #vk.1 ) )
+          case c_pk
+          by step( solve( !KU( ~ltkA ) @ #vk.3 ) )
+        qed
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !Pk( 'A', pkA ) ▶₁ #i ) )
+      case Register_pk
+      step( solve( !KU( enc(pk(~ltkA), pw) ) @ #vk ) )
+        case A_1
+        MIRRORED
+      next
+        case c_enc
+        step( solve( !KU( pk(~ltkA) ) @ #vk.1 ) )
+          case c_pk
+          by step( solve( !KU( ~ltkA ) @ #vk.3 ) )
+        qed
+      qed
+    qed
+  qed
+next
+  case Rule_Destrd_0_adec
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !KD( aenc(x, pk(x.1)) ) ▶₀ #i ) )
+      case A_1
+      by step( solve( (#vl, 0) ~~> (#i, 0) ) )
+    next
+      case B_1
+      by step( solve( (#vl, 0) ~~> (#i, 0) ) )
+    next
+      case Password_guess
+      step( solve( !Own( t ) ▶₀ #vr ) )
+        case Password_init
+        by step( contradiction /* impossible chain */ )
+      qed
+    next
+      case dec_dontKnow
+      by step( contradiction /* forbidden chain */ )
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !KD( aenc(x, pk(x.1)) ) ▶₀ #i ) )
+      case A_1
+      by step( solve( (#vl, 0) ~~> (#i, 0) ) )
+    next
+      case B_1
+      by step( solve( (#vl, 0) ~~> (#i, 0) ) )
+    next
+      case Password_guess
+      by step( contradiction /* impossible chain */ )
+    next
+      case dec_dontKnow
+      by step( contradiction /* forbidden chain */ )
+    qed
+  qed
+next
+  case Rule_Destrd_0_fst
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !KD( <x, x.1> ) ▶₀ #i ) )
+      case A_1
+      by step( solve( (#vl, 0) ~~> (#i, 0) ) )
+    next
+      case B_1
+      by step( solve( (#vl, 0) ~~> (#i, 0) ) )
+    next
+      case Password_guess
+      step( solve( !Own( t ) ▶₀ #vr ) )
+        case Password_init
+        by step( contradiction /* impossible chain */ )
+      qed
+    next
+      case dec_dontKnow
+      by step( contradiction /* forbidden chain */ )
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !KD( <x, x.1> ) ▶₀ #i ) )
+      case A_1
+      by step( solve( (#vl, 0) ~~> (#i, 0) ) )
+    next
+      case B_1
+      by step( solve( (#vl, 0) ~~> (#i, 0) ) )
+    next
+      case Password_guess
+      by step( contradiction /* impossible chain */ )
+    next
+      case dec_dontKnow
+      by step( contradiction /* forbidden chain */ )
+    qed
+  qed
+next
+  case Rule_Destrd_0_snd
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !KD( <x, x.1> ) ▶₀ #i ) )
+      case A_1
+      by step( solve( (#vl, 0) ~~> (#i, 0) ) )
+    next
+      case B_1
+      by step( solve( (#vl, 0) ~~> (#i, 0) ) )
+    next
+      case Password_guess
+      step( solve( !Own( t ) ▶₀ #vr ) )
+        case Password_init
+        by step( contradiction /* impossible chain */ )
+      qed
+    next
+      case dec_dontKnow
+      by step( contradiction /* forbidden chain */ )
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !KD( <x, x.1> ) ▶₀ #i ) )
+      case A_1
+      by step( solve( (#vl, 0) ~~> (#i, 0) ) )
+    next
+      case B_1
+      by step( solve( (#vl, 0) ~~> (#i, 0) ) )
+    next
+      case Password_guess
+      by step( contradiction /* impossible chain */ )
+    next
+      case dec_dontKnow
+      by step( contradiction /* forbidden chain */ )
+    qed
+  qed
+next
+  case Rule_Equality
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !KD( x ) ▶₁ #i ) )
+      case A_1
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case enc
+        step( solve( !Ltk( 'A', skA ) ▶₀ #vr ) )
+          case Register_pk
+          step( solve( !Own( pw ) ▶₁ #vr ) )
+            case Password_init
+            step( solve( !KU( enc(pk(~ltkA), ~pw) ) @ #vk ) )
+              case A_1
+              MIRRORED
+            next
+              case c_enc
+              step( solve( !KU( ~pw ) @ #vk.2 ) )
+                case Password_guess
+                step( solve( !KU( pk(~ltkA) ) @ #vk.2 ) )
+                  case c_pk
+                  by step( solve( !KU( ~ltkA ) @ #vk.3 ) )
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    next
+      case B_1
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case enc
+        step( solve( !Pk( 'A', pkA ) ▶₁ #vr ) )
+          case Register_pk
+          step( solve( !KU( enc(pk(~ltkA), pw) ) @ #vk.1 ) )
+            case A_1
+            step( solve( !KU( enc(aenc(~r, pk(~ltkA)), ~pw) ) @ #vk.1 ) )
+              case B_1
+              MIRRORED
+            next
+              case c_enc
+              step( solve( !KU( ~pw ) @ #vk.3 ) )
+                case Password_guess
+                step( solve( !KU( aenc(~r, pk(~ltkA)) ) @ #vk.3 ) )
+                  case c_aenc
+                  by step( solve( !KU( ~r ) @ #vk.4 ) )
+                qed
+              qed
+            qed
+          next
+            case c_enc
+            step( solve( !KU( pk(~ltkA) ) @ #vk.2 ) )
+              case c_pk
+              by step( solve( !KU( ~ltkA ) @ #vk.4 ) )
+            qed
+          qed
+        qed
+      qed
+    next
+      case Password_guess
+      step( solve( !Own( t ) ▶₀ #vr ) )
+        case Password_init
+        step( solve( (#vl, 0) ~~> (#i, 1) ) )
+          case Var_fresh_pw
+          step( solve( !KU( ~pw ) @ #vk ) )
+            case Password_guess
+            MIRRORED
+          qed
+        qed
+      qed
+    next
+      case dec_dontKnow
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case Var_msg_t
+        step( solve( !KU( dec(enc(t, y), y) ) @ #vk.1 ) )
+          case c_dec
+          step( solve( !KU( enc(t, y) ) @ #vk.2 ) )
+            case A_1
+            step( solve( !KU( ~pw ) @ #vk.3 ) )
+              case Password_guess
+              step( solve( !KU( pk(~ltkA) ) @ #vk.3 ) )
+                case c_pk
+                by step( solve( !KU( ~ltkA ) @ #vk.4 ) )
+              qed
+            qed
+          next
+            case B_1
+            step( solve( !KU( aenc(~r, pk(~ltkA)) ) @ #vk.2 ) )
+              case c_aenc
+              by step( solve( !KU( ~r ) @ #vk.5 ) )
+            qed
+          next
+            case c_enc
+            MIRRORED
+          qed
+        qed
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !KD( x ) ▶₁ #i ) )
+      case A_1
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case enc
+        step( solve( !Ltk( 'A', skA ) ▶₀ #vr ) )
+          case Register_pk
+          step( solve( !Own( pw ) ▶₁ #vr ) )
+            case Password_init
+            step( solve( !KU( enc(pk(~ltkA), ~pw) ) @ #vk ) )
+              case A_1
+              MIRRORED
+            next
+              case c_enc
+              by step( solve( !KU( ~pw ) @ #vk.2 ) )
+            qed
+          qed
+        qed
+      qed
+    next
+      case B_1
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case enc
+        step( solve( !Pk( 'A', pkA ) ▶₁ #vr ) )
+          case Register_pk
+          step( solve( !KU( enc(pk(~ltkA), pw) ) @ #vk.1 ) )
+            case A_1
+            step( solve( !KU( enc(aenc(~r, pk(~ltkA)), ~pw) ) @ #vk.1 ) )
+              case B_1
+              MIRRORED
+            next
+              case c_enc
+              by step( solve( !KU( ~pw ) @ #vk.3 ) )
+            qed
+          next
+            case c_enc
+            step( solve( !KU( pk(~ltkA) ) @ #vk.2 ) )
+              case c_pk
+              by step( solve( !KU( ~ltkA ) @ #vk.4 ) )
+            qed
+          qed
+        qed
+      qed
+    next
+      case Password_guess
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case Var_fresh_rc
+        step( solve( !Own( pw ) ▶₀ #vr ) )
+          case Password_init
+          step( solve( !KU( ~rc ) @ #vk ) )
+            case Password_guess
+            MIRRORED
+          qed
+        qed
+      qed
+    next
+      case dec_dontKnow
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case Var_msg_t
+        step( solve( !KU( dec(enc(t, y), y) ) @ #vk.1 ) )
+          case c_dec
+          step( solve( !KU( enc(t, y) ) @ #vk.2 ) )
+            case A_1
+            by step( solve( !KU( ~pw ) @ #vk.3 ) )
+          next
+            case B_1
+            step( solve( !KU( aenc(~r, pk(~ltkA)) ) @ #vk.2 ) )
+              case c_aenc
+              by step( solve( !KU( ~r ) @ #vk.5 ) )
+            qed
+          next
+            case c_enc
+            MIRRORED
+          qed
+        qed
+      qed
+    qed
+  qed
+next
+  case Rule_Password_guess
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !Own( pw ) ▶₀ #i ) )
+      case Password_init
+      MIRRORED
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !Own( pw ) ▶₀ #i ) )
+      case Password_init
+      MIRRORED
+    qed
+  qed
+next
+  case Rule_Password_init
+  backward-search
+    case LHS
+    step( simplify )
+    MIRRORED
+  next
+    case RHS
+    step( simplify )
+    MIRRORED
+  qed
+next
+  case Rule_Register_pk
+  backward-search
+    case LHS
+    step( simplify )
+    MIRRORED
+  next
+    case RHS
+    step( simplify )
+    MIRRORED
+  qed
+next
+  case Rule_Send
+  backward-search
+    case LHS
+    step( simplify )
+    MIRRORED
+  next
+    case RHS
+    step( simplify )
+    MIRRORED
+  qed
+next
+  case Rule_dec_dontKnow
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !KU( dec(enc(x, y), y) ) @ #vk ) )
+      case c_dec
+      step( solve( !KU( enc(x, y) ) @ #vk.2 ) )
+        case A_1
+        step( solve( !KU( ~pw ) @ #vk.3 ) )
+          case Password_guess
+          step( solve( !KU( pk(~ltkA) ) @ #vk.3 ) )
+            case c_pk
+            by step( solve( !KU( ~ltkA ) @ #vk.4 ) )
+          qed
+        qed
+      next
+        case B_1
+        step( solve( !KU( aenc(~r, pk(~ltkA)) ) @ #vk.2 ) )
+          case c_aenc
+          by step( solve( !KU( ~r ) @ #vk.5 ) )
+        qed
+      next
+        case c_enc
+        MIRRORED
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !KU( dec(enc(x, y), y) ) @ #vk ) )
+      case c_dec
+      step( solve( !KU( enc(x, y) ) @ #vk.2 ) )
+        case A_1
+        by step( solve( !KU( ~pw ) @ #vk.3 ) )
+      next
+        case B_1
+        step( solve( !KU( aenc(~r, pk(~ltkA)) ) @ #vk.2 ) )
+          case c_aenc
+          by step( solve( !KU( ~r ) @ #vk.5 ) )
+        qed
+      next
+        case c_enc
+        MIRRORED
+      qed
+    qed
+  qed
+qed
+
+end

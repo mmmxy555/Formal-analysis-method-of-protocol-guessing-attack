@@ -1,0 +1,75 @@
+theory Maitra
+begin
+builtins: hashing, xor
+functions: Hbio/1
+
+
+rule User_init:
+    [ Fr(~ID),Fr(~PW) ]
+  --[ Init_once('User') ]->
+    [ !Own_User(~ID,~PW) ]
+
+rule Server_init:
+    [ Fr(~x) ]
+  --[ Init_once('Server') ]->
+    [ Own_server(~x) ]
+rule Regist_User:
+    [ !Own_User(ID,PW) ]
+  --[  ]->
+    [ Out_S1($User,$Server,<ID,PW>),User_state1(ID,PW) ]
+
+rule Regist_Server:
+  let
+    A=h(ID,h(x))
+    PWR=h(PW,~ns)
+    L=A ⊕ PWR
+    B=h(A,PWR)
+    n=~ns ⊕ h(ID,PW)
+    SmartCard=<L,B,n>
+    store=h(h(A))
+  in
+    [ Own_server(x),Out_S1($User,$Server,<ID,PW>),Fr(~ns) ]
+  --[  ]->
+    [ Out_S2($Server,$User,SmartCard),Server_state1(x,store) ]
+
+
+rule User_Login:
+  let
+    SmartCard=<L,B,n>
+    ns=n ⊕ h(ID,PW)
+    PWR=h(PW,ns)
+    A=L ⊕ PWR
+    Bverif=h(A,PWR)
+  in
+    [ Out_S2($Server,$User,SmartCard),User_state1(ID,PW) ]
+  --[ Eq(Bverif,B),Finish(ID,PW,SmartCard) ]->
+    [ Out_S3($User,$SC,SmartCard),User_state2(ID,PW,SmartCard) ]
+
+
+// rule SmartCardLost:
+//   let
+//     SmartCard=<L,B,n>
+//   in
+//     [ User_state2(ID,PW,SmartCard) ]
+//   --[ Khave(ID,PW,SmartCard),Init_once('B') ]->
+//     [ !Attacker_know(SmartCard),Out(SmartCard) ]
+
+
+rule Password_guess:
+    [ !Own_User(ID,PW),Fr(~x),Fr(~y) ]
+  --[ Guess_once() ]->
+    [ Out(diff(<ID,PW>,<~x,~y>)) ]
+
+
+restriction unique_init:
+"
+    All #i #j name. Init_once(name) @i & Init_once(name) @j ==> #i =#j
+"
+
+restriction Verif:
+"
+    All x y #i. Eq(x,y) @ i ==> x = y
+"
+
+
+end

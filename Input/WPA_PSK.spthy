@@ -1,0 +1,51 @@
+theory WPA 
+begin
+
+builtins: asymmetric-encryption
+functions:Len/1,pdkdf2_SHA1/4,SHA1_PRF/7,HMAC_MD5/2,Min/2,Max/2
+
+rule Password_init:
+    [ Fr(~pw) ]
+  --[ Init_pw_once() ]->
+    [ !Own(~pw) ]
+
+rule AP_1:
+    [ !Own(pw) ]
+  --[  ]->
+    [ Out(<'SSID','AP_MAC'>),AP_state_1(pw) ]
+
+rule STA_1:
+    [ !Own(pw),Fr(~SNonce),In(<'SSID','AP_MAC'>) ]
+  --[  ]->
+    [ Out(<~SNonce,'STA_MAC'>),STA_state_1(pw,~SNonce) ]
+
+rule AP_2:
+    [ AP_state_1(pw),Fr(~ANonce),In(<SNonce,'STA_MAC'>) ]
+  --[  ]->
+    [ Out(~ANonce) ]
+
+rule STA_2:
+  let
+    PMK=pdkdf2_SHA1(pw, 'SSID', 'SSID_length', '4096')
+    PTK=SHA1_PRF(PMK, Len(PMK), 'Pairwise_key_expansion', Min('AP_MAC', 'STA_MAC') , Max('AP_MAC', 'STA_MAC') , Min(ANonce, SNonce) , Max(ANonce, SNonce))
+  in
+    [ STA_state_1(pw,SNonce),In(ANonce),Fr(~data) ]
+  --[  ]->
+    [ Out(<~data,HMAC_MD5(PTK,~data)>) ]
+
+rule Password_guess:
+    [ !Own(pw),Fr(~rc) ]
+  --[ Guess_once() ]->
+    [ Out(diff(pw,~rc)) ]
+
+
+
+restriction Init:
+" 
+   All #i #j. Init_pw_once()@i & Init_pw_once()@j ==> #i=#j
+"
+restriction guess:
+" 
+   All #i #j. Guess_once()@i & Guess_once()@j ==> #i=#j
+"
+end

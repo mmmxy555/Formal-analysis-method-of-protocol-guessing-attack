@@ -1,0 +1,182 @@
+theory Zhang begin
+
+// Function signature and definition of the equational theory E
+
+builtins: xor
+functions: Hbio/1, fst/1, h/1, pair/2, snd/1
+equations: fst(<x.1, x.2>) = x.1, snd(<x.1, x.2>) = x.2
+
+
+
+rule (modulo E) User_init:
+   [ Fr( ~ID ), Fr( ~PW ), Fr( ~B ) ]
+  --[ Init_pw_once( ) ]->
+   [ !Own_User( ~ID, ~PW, ~B ) ]
+
+rule (modulo E) Server_init:
+   [ Fr( ~s ), Fr( ~IDsc ) ]
+  --[ Init_once( 'Server' ) ]->
+   [ Own_server( ~s, ~IDsc ) ]
+
+rule (modulo E) Regist_smartcard:
+   [
+   !Own_User( ID, PW, B ), Own_server( s, IDsc ), Fr( ~r1 ), Fr( ~r2 )
+   ]
+  --[ Init_once( '1' ) ]->
+   [
+   Out( <IDsc, 
+         (~r2⊕h(<IDsc, h(<ID, PW, Hbio(B)>), h(<Hbio((~r1⊕B)), s>)>)), 
+         (h(<ID, PW, Hbio(B)>)⊕h(<Hbio((~r1⊕B)), s>)), (~r1⊕Hbio(B))>
+   ),
+   Out( <ID, B> ),
+   Regist( <IDsc, 
+            (~r2⊕h(<IDsc, h(<ID, PW, Hbio(B)>), h(<Hbio((~r1⊕B)), s>)>)), 
+            (h(<ID, PW, Hbio(B)>)⊕h(<Hbio((~r1⊕B)), s>)), (~r1⊕Hbio(B))>,
+           ID, PW, B, ~r1, ~r2
+   )
+   ]
+
+rule (modulo E) A_User_Login:
+   [ Regist( <IDsc, X, Y, Z>, ID, PW, B, r1, r2 ) ]
+  --[ Finish( ID, PW, B ), Init_once( '3' ) ]->
+   [
+   Out( h(<B, r1, r2>) ),
+   User_state3( ID, PW, B, r1, <IDsc, X, Y, Z>, h(<B, r1, r2>) )
+   ]
+
+rule (modulo E) Password_guess:
+   [ !Own_User( ID, PW, B ), Fr( ~rpw ) ]
+  --[ Guess_once( ) ]->
+   [ Out( diff(PW, ~rpw) ) ]
+
+restriction Init [right]:
+  "∀ #i #j.
+    ((Init_pw_once( ) @ #i) ∧ (Init_pw_once( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction Init [left]:
+  "∀ #i #j.
+    ((Init_pw_once( ) @ #i) ∧ (Init_pw_once( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction guess [right]:
+  "∀ #i #j.
+    ((Guess_once( ) @ #i) ∧ (Guess_once( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction guess [left]:
+  "∀ #i #j.
+    ((Guess_once( ) @ #i) ∧ (Guess_once( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction unique_init [right]:
+  "∀ #i #j name.
+    ((Init_once( name ) @ #i) ∧ (Init_once( name ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction unique_init [left]:
+  "∀ #i #j name.
+    ((Init_once( name ) @ #i) ∧ (Init_once( name ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+/* All well-formedness checks were successful. */
+
+diffLemma Observational_equivalence:
+rule-equivalence
+  case Rule_A_User_Login
+  by sorry
+next
+  case Rule_Destrd_0_fst
+  by sorry
+next
+  case Rule_Destrd_0_snd
+  by sorry
+next
+  case Rule_Destrd_xor
+  by sorry
+next
+  case Rule_Equality
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !KD( x ) ▶₁ #i ) )
+      case A_User_Login
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case h
+        step( solve( Regist( <IDsc, X, Y, Z>, ID, PW, B, r1, r2
+                     ) ▶₀ #vr ) )
+          case Regist_smartcard
+          step( solve( !KU( h(<~B, ~r1, ~r2>) ) @ #vk ) )
+            case c_h
+            step( solve( !KU( ~r1 ) @ #vk.4 ) )
+              case Regist_smartcard
+              step( solve( !KU( ~r2 ) @ #vk.5 ) )
+                case Regist_smartcard
+                step( solve( !KU( Hbio(~B) ) @ #vk.6 ) )
+                  case c_Hbio
+                  step( solve( !KU( h(<~IDsc, h(<~ID, ~PW, Hbio(~B)>), 
+                                       h(<Hbio(x), ~s>)>)
+                               ) @ #vk.7 ) )
+                    case c_h
+                    step( solve( !KU( h(<~ID, ~PW, Hbio(~B)>) ) @ #vk.11 ) )
+                      case c_h
+                      step( solve( !KU( ~PW ) @ #vk.16 ) )
+                        case Password_guess
+                        step( solve( !KU( h(<Hbio(x), ~s>) ) @ #vk.15 ) )
+                          case Regist_smartcard
+                          step( solve( !KU( ~B ) @ #vk.14 ) )
+                            case Regist_smartcard
+                            step( solve( !KU( ~IDsc ) @ #vk.15 ) )
+                              case Regist_smartcard
+                              step( solve( !KU( ~ID ) @ #vk.16 ) )
+                                case Regist_smartcard
+                                step( solve( splitEqs(1) ) )
+                                  case split
+                                  by ATTACK // trace found
+                                qed
+                              qed
+                            qed
+                          qed
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    next
+      case Password_guess
+      by sorry
+    next
+      case Regist_smartcard_case_1
+      by sorry
+    next
+      case Regist_smartcard_case_2
+      by sorry
+    qed
+  next
+    case RHS
+    step( simplify )
+    by sorry
+  qed
+next
+  case Rule_Password_guess
+  by sorry
+next
+  case Rule_Regist_smartcard
+  by sorry
+next
+  case Rule_Send
+  by sorry
+next
+  case Rule_Server_init
+  by sorry
+next
+  case Rule_User_init
+  by sorry
+qed
+
+end

@@ -1,0 +1,957 @@
+theory CHAP begin
+
+// Function signature and definition of the equational theory E
+
+functions: fst/1, h/1, pair/2, snd/1
+equations: fst(<x.1, x.2>) = x.1, snd(<x.1, x.2>) = x.2
+
+
+
+rule (modulo E) Password_init:
+   [ Fr( ~pw ) ] --[ Init_pw_once( ) ]-> [ !Own( ~pw ) ]
+
+rule (modulo E) Server_challenge:
+   [ !Own( pw ), Fr( ~random_challenge ) ]
+  --[ S1( ) ]->
+   [
+   Out( <'01', ~random_challenge> ),
+   Server_challenge_done( ~random_challenge, pw )
+   ]
+
+rule (modulo E) User_response:
+   [ !Own( pw ), In( <'01', random_challenge> ) ]
+  --[ U1( ) ]->
+   [ Out( <'02', h(<pw, random_challenge>)> ), User_response_done( ) ]
+
+rule (modulo E) Server_verify:
+   [ In( <'02', hash> ), Server_challenge_done( random_challenge, pw ) ]
+  --[ Eq( hash, h(<pw, random_challenge>) ), Finish( pw ) ]->
+   [ Finish( pw ) ]
+
+rule (modulo E) Password_guess:
+   [ !Own( pw ), Fr( ~rc ) ] --[ Guess_once( ) ]-> [ Out( diff(pw, ~rc) ) ]
+
+restriction Verif [right]:
+  "∀ x y #i. (Eq( x, y ) @ #i) ⇒ (x = y)"
+  // safety formula
+
+restriction Verif [left]:
+  "∀ x y #i. (Eq( x, y ) @ #i) ⇒ (x = y)"
+  // safety formula
+
+restriction Init [right]:
+  "∀ #i #j. ((Init_pw_once( ) @ #i) ∧ (Init_pw_once( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction Init [left]:
+  "∀ #i #j. ((Init_pw_once( ) @ #i) ∧ (Init_pw_once( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction guess [right]:
+  "∀ #i #j. ((Guess_once( ) @ #i) ∧ (Guess_once( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction guess [left]:
+  "∀ #i #j. ((Guess_once( ) @ #i) ∧ (Guess_once( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+/* All well-formedness checks were successful. */
+
+diffLemma Observational_equivalence:
+rule-equivalence
+  case Rule_Destrd_0_fst
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !KD( <x, x.1> ) ▶₀ #i ) )
+      case Password_guess
+      step( solve( !Own( t ) ▶₀ #vr ) )
+        case Password_init
+        by step( contradiction /* impossible chain */ )
+      qed
+    next
+      case Server_challenge
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( contradiction /* impossible chain */ )
+      next
+        case pair
+        MIRRORED
+      qed
+    next
+      case User_response
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( solve( (#vr.1, 0) ~~> (#i, 0) ) )
+      next
+        case pair
+        step( solve( !Own( pw ) ▶₀ #vr ) )
+          case Password_init
+          step( solve( !KU( '01' ) @ #vk.1 ) )
+            case coerce
+            step( solve( !KD( '01' ) ▶₀ #vk.1 ) )
+              case Password_guess
+              step( solve( !Own( t ) ▶₀ #vr.2 ) )
+                case Password_init
+                by step( contradiction /* impossible chain */ )
+              qed
+            next
+              case Server_challenge
+              by step( contradiction /* impossible chain */ )
+            next
+              case User_response
+              by step( contradiction /* cyclic */ )
+            qed
+          next
+            case pub
+            MIRRORED
+          qed
+        qed
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !KD( <x, x.1> ) ▶₀ #i ) )
+      case Password_guess
+      by step( contradiction /* impossible chain */ )
+    next
+      case Server_challenge
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( contradiction /* impossible chain */ )
+      next
+        case pair
+        MIRRORED
+      qed
+    next
+      case User_response
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( solve( (#vr.1, 0) ~~> (#i, 0) ) )
+      next
+        case pair
+        step( solve( !Own( pw ) ▶₀ #vr ) )
+          case Password_init
+          step( solve( !KU( '01' ) @ #vk.1 ) )
+            case coerce
+            step( solve( !KD( '01' ) ▶₀ #vk.1 ) )
+              case Password_guess
+              by step( contradiction /* impossible chain */ )
+            next
+              case Server_challenge
+              by step( contradiction /* impossible chain */ )
+            next
+              case User_response
+              by step( contradiction /* cyclic */ )
+            qed
+          next
+            case pub
+            MIRRORED
+          qed
+        qed
+      qed
+    qed
+  qed
+next
+  case Rule_Destrd_0_snd
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !KD( <x, x.1> ) ▶₀ #i ) )
+      case Password_guess
+      step( solve( !Own( t ) ▶₀ #vr ) )
+        case Password_init
+        by step( contradiction /* impossible chain */ )
+      qed
+    next
+      case Server_challenge
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( contradiction /* impossible chain */ )
+      next
+        case pair
+        MIRRORED
+      qed
+    next
+      case User_response
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( solve( (#vr.1, 0) ~~> (#i, 0) ) )
+      next
+        case pair
+        step( solve( !Own( pw ) ▶₀ #vr ) )
+          case Password_init
+          step( solve( !KU( '01' ) @ #vk.1 ) )
+            case coerce
+            step( solve( !KD( '01' ) ▶₀ #vk.1 ) )
+              case Password_guess
+              step( solve( !Own( t ) ▶₀ #vr.2 ) )
+                case Password_init
+                by step( contradiction /* impossible chain */ )
+              qed
+            next
+              case Server_challenge
+              by step( contradiction /* impossible chain */ )
+            next
+              case User_response
+              by step( contradiction /* cyclic */ )
+            qed
+          next
+            case pub
+            MIRRORED
+          qed
+        qed
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !KD( <x, x.1> ) ▶₀ #i ) )
+      case Password_guess
+      by step( contradiction /* impossible chain */ )
+    next
+      case Server_challenge
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( contradiction /* impossible chain */ )
+      next
+        case pair
+        MIRRORED
+      qed
+    next
+      case User_response
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( solve( (#vr.1, 0) ~~> (#i, 0) ) )
+      next
+        case pair
+        step( solve( !Own( pw ) ▶₀ #vr ) )
+          case Password_init
+          step( solve( !KU( '01' ) @ #vk.1 ) )
+            case coerce
+            step( solve( !KD( '01' ) ▶₀ #vk.1 ) )
+              case Password_guess
+              by step( contradiction /* impossible chain */ )
+            next
+              case Server_challenge
+              by step( contradiction /* impossible chain */ )
+            next
+              case User_response
+              by step( contradiction /* cyclic */ )
+            qed
+          next
+            case pub
+            MIRRORED
+          qed
+        qed
+      qed
+    qed
+  qed
+next
+  case Rule_Equality
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !KD( x ) ▶₁ #i ) )
+      case Password_guess
+      step( solve( !Own( t ) ▶₀ #vr ) )
+        case Password_init
+        step( solve( (#vl, 0) ~~> (#i, 1) ) )
+          case Var_fresh_pw
+          step( solve( !KU( ~pw ) @ #vk ) )
+            case Password_guess
+            MIRRORED
+          qed
+        qed
+      qed
+    next
+      case Server_challenge
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case d_0_fst
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case Const_pub_01
+          step( solve( !Own( pw ) ▶₀ #vr ) )
+            case Password_init
+            step( solve( !KU( '01' ) @ #vk ) )
+              case coerce
+              step( solve( !KD( '01' ) ▶₀ #vk ) )
+                case Password_guess
+                step( solve( !Own( t ) ▶₀ #vr.3 ) )
+                  case Password_init
+                  by step( contradiction /* impossible chain */ )
+                qed
+              next
+                case Server_challenge
+                by step( contradiction /* impossible chain */ )
+              next
+                case User_response
+                by step( contradiction /* cyclic */ )
+              qed
+            next
+              case pub
+              MIRRORED
+            qed
+          qed
+        qed
+      next
+        case d_0_snd
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case Var_fresh_random_challenge
+          step( solve( !Own( pw ) ▶₀ #vr ) )
+            case Password_init
+            step( solve( !KU( ~random_challenge ) @ #vk ) )
+              case Server_challenge
+              MIRRORED
+            qed
+          qed
+        qed
+      next
+        case pair
+        step( solve( !Own( pw ) ▶₀ #vr ) )
+          case Password_init
+          step( solve( !KU( ~random_challenge ) @ #vk.2 ) )
+            case Server_challenge
+            step( solve( !KU( '01' ) @ #vk.2 ) )
+              case coerce
+              step( solve( !KD( '01' ) ▶₀ #vk.2 ) )
+                case Password_guess
+                step( solve( !Own( t ) ▶₀ #vr.3 ) )
+                  case Password_init
+                  by step( contradiction /* impossible chain */ )
+                qed
+              next
+                case Server_challenge
+                by step( contradiction /* impossible chain */ )
+              next
+                case User_response
+                by step( contradiction /* cyclic */ )
+              qed
+            next
+              case pub
+              MIRRORED
+            qed
+          qed
+        qed
+      qed
+    next
+      case User_response
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case d_0_fst
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case Const_pub_02
+          step( solve( !Own( pw ) ▶₀ #vr ) )
+            case Password_init
+            step( solve( !KU( '01' ) @ #vk.2 ) )
+              case coerce
+              step( solve( !KD( '01' ) ▶₀ #vk.1 ) )
+                case Password_guess
+                step( solve( !Own( t ) ▶₀ #vr.3 ) )
+                  case Password_init
+                  by step( contradiction /* impossible chain */ )
+                qed
+              next
+                case Server_challenge
+                by step( contradiction /* impossible chain */ )
+              next
+                case User_response
+                by step( contradiction /* cyclic */ )
+              qed
+            next
+              case pub
+              step( solve( !KU( '02' ) @ #vk.2 ) )
+                case coerce
+                step( solve( !KD( '02' ) ▶₀ #vk.2 ) )
+                  case Password_guess
+                  step( solve( !Own( t ) ▶₀ #vr.3 ) )
+                    case Password_init
+                    by step( contradiction /* impossible chain */ )
+                  qed
+                next
+                  case Server_challenge
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case User_response
+                  step( solve( (#vl.1, 0) ~~> (#vk.2, 0) ) )
+                    case d_0_fst
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case d_0_snd
+                    by step( solve( (#vr.4, 0) ~~> (#vk.2, 0) ) )
+                  qed
+                qed
+              next
+                case pub
+                MIRRORED
+              qed
+            qed
+          qed
+        qed
+      next
+        case d_0_snd
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case h
+          step( solve( !Own( pw ) ▶₀ #vr ) )
+            case Password_init
+            step( solve( !KU( '01' ) @ #vk.2 ) )
+              case coerce
+              step( solve( !KD( '01' ) ▶₀ #vk.1 ) )
+                case Password_guess
+                step( solve( !Own( t ) ▶₀ #vr.3 ) )
+                  case Password_init
+                  by step( contradiction /* impossible chain */ )
+                qed
+              next
+                case Server_challenge
+                by step( contradiction /* impossible chain */ )
+              next
+                case User_response
+                by step( contradiction /* cyclic */ )
+              qed
+            next
+              case pub
+              step( solve( !KU( h(<~pw, random_challenge>) ) @ #vk.2 ) )
+                case User_response
+                MIRRORED
+              next
+                case c_h
+                step( solve( !KU( ~pw ) @ #vk.5 ) )
+                  case Password_guess
+                  by ATTACK // trace found
+                qed
+              qed
+            qed
+          qed
+        qed
+      next
+        case pair
+        step( solve( !Own( pw ) ▶₀ #vr ) )
+          case Password_init
+          step( solve( !KU( '01' ) @ #vk.2 ) )
+            case coerce
+            step( solve( !KD( '01' ) ▶₀ #vk.2 ) )
+              case Password_guess
+              step( solve( !Own( t ) ▶₀ #vr.2 ) )
+                case Password_init
+                by step( contradiction /* impossible chain */ )
+              qed
+            next
+              case Server_challenge
+              by step( contradiction /* impossible chain */ )
+            next
+              case User_response
+              by step( contradiction /* cyclic */ )
+            qed
+          next
+            case pub
+            step( solve( !KU( '02' ) @ #vk.4 ) )
+              case coerce
+              step( solve( !KD( '02' ) ▶₀ #vk.3 ) )
+                case Password_guess
+                step( solve( !Own( t ) ▶₀ #vr.2 ) )
+                  case Password_init
+                  by step( contradiction /* impossible chain */ )
+                qed
+              next
+                case Server_challenge
+                by step( contradiction /* impossible chain */ )
+              next
+                case User_response
+                step( solve( (#vl.1, 0) ~~> (#vk.3, 0) ) )
+                  case d_0_fst
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case d_0_snd
+                  by step( solve( (#vr.3, 0) ~~> (#vk.3, 0) ) )
+                qed
+              qed
+            next
+              case pub
+              step( solve( !KU( h(<~pw, random_challenge>) ) @ #vk.5 ) )
+                case User_response
+                MIRRORED
+              next
+                case c_h
+                step( solve( !KU( ~pw ) @ #vk.7 ) )
+                  case Password_guess
+                  by ATTACK // trace found
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !KD( x ) ▶₁ #i ) )
+      case Password_guess
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case Var_fresh_rc
+        step( solve( !Own( pw ) ▶₀ #vr ) )
+          case Password_init
+          step( solve( !KU( ~rc ) @ #vk ) )
+            case Password_guess
+            MIRRORED
+          qed
+        qed
+      qed
+    next
+      case Server_challenge
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case d_0_fst
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case Const_pub_01
+          step( solve( !Own( pw ) ▶₀ #vr ) )
+            case Password_init
+            step( solve( !KU( '01' ) @ #vk ) )
+              case coerce
+              step( solve( !KD( '01' ) ▶₀ #vk ) )
+                case Password_guess
+                by step( contradiction /* impossible chain */ )
+              next
+                case Server_challenge
+                by step( contradiction /* impossible chain */ )
+              next
+                case User_response
+                by step( contradiction /* cyclic */ )
+              qed
+            next
+              case pub
+              MIRRORED
+            qed
+          qed
+        qed
+      next
+        case d_0_snd
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case Var_fresh_random_challenge
+          step( solve( !Own( pw ) ▶₀ #vr ) )
+            case Password_init
+            step( solve( !KU( ~random_challenge ) @ #vk ) )
+              case Server_challenge
+              MIRRORED
+            qed
+          qed
+        qed
+      next
+        case pair
+        step( solve( !Own( pw ) ▶₀ #vr ) )
+          case Password_init
+          step( solve( !KU( ~random_challenge ) @ #vk.2 ) )
+            case Server_challenge
+            step( solve( !KU( '01' ) @ #vk.2 ) )
+              case coerce
+              step( solve( !KD( '01' ) ▶₀ #vk.2 ) )
+                case Password_guess
+                by step( contradiction /* impossible chain */ )
+              next
+                case Server_challenge
+                by step( contradiction /* impossible chain */ )
+              next
+                case User_response
+                by step( contradiction /* cyclic */ )
+              qed
+            next
+              case pub
+              MIRRORED
+            qed
+          qed
+        qed
+      qed
+    next
+      case User_response
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case d_0_fst
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case Const_pub_02
+          step( solve( !Own( pw ) ▶₀ #vr ) )
+            case Password_init
+            step( solve( !KU( '01' ) @ #vk.2 ) )
+              case coerce
+              step( solve( !KD( '01' ) ▶₀ #vk.1 ) )
+                case Password_guess
+                by step( contradiction /* impossible chain */ )
+              next
+                case Server_challenge
+                by step( contradiction /* impossible chain */ )
+              next
+                case User_response
+                by step( contradiction /* cyclic */ )
+              qed
+            next
+              case pub
+              step( solve( !KU( '02' ) @ #vk.2 ) )
+                case coerce
+                step( solve( !KD( '02' ) ▶₀ #vk.2 ) )
+                  case Password_guess
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case Server_challenge
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case User_response
+                  step( solve( (#vl.1, 0) ~~> (#vk.2, 0) ) )
+                    case d_0_fst
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case d_0_snd
+                    by step( solve( (#vr.4, 0) ~~> (#vk.2, 0) ) )
+                  qed
+                qed
+              next
+                case pub
+                MIRRORED
+              qed
+            qed
+          qed
+        qed
+      next
+        case d_0_snd
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case h
+          step( solve( !Own( pw ) ▶₀ #vr ) )
+            case Password_init
+            step( solve( !KU( '01' ) @ #vk.2 ) )
+              case coerce
+              step( solve( !KD( '01' ) ▶₀ #vk.1 ) )
+                case Password_guess
+                by step( contradiction /* impossible chain */ )
+              next
+                case Server_challenge
+                by step( contradiction /* impossible chain */ )
+              next
+                case User_response
+                by step( contradiction /* cyclic */ )
+              qed
+            next
+              case pub
+              step( solve( !KU( h(<~pw, random_challenge>) ) @ #vk.2 ) )
+                case User_response
+                MIRRORED
+              next
+                case c_h
+                by step( solve( !KU( ~pw ) @ #vk.5 ) )
+              qed
+            qed
+          qed
+        qed
+      next
+        case pair
+        step( solve( !Own( pw ) ▶₀ #vr ) )
+          case Password_init
+          step( solve( !KU( '01' ) @ #vk.2 ) )
+            case coerce
+            step( solve( !KD( '01' ) ▶₀ #vk.2 ) )
+              case Password_guess
+              by step( contradiction /* impossible chain */ )
+            next
+              case Server_challenge
+              by step( contradiction /* impossible chain */ )
+            next
+              case User_response
+              by step( contradiction /* cyclic */ )
+            qed
+          next
+            case pub
+            step( solve( !KU( '02' ) @ #vk.4 ) )
+              case coerce
+              step( solve( !KD( '02' ) ▶₀ #vk.3 ) )
+                case Password_guess
+                by step( contradiction /* impossible chain */ )
+              next
+                case Server_challenge
+                by step( contradiction /* impossible chain */ )
+              next
+                case User_response
+                step( solve( (#vl.1, 0) ~~> (#vk.3, 0) ) )
+                  case d_0_fst
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case d_0_snd
+                  by step( solve( (#vr.3, 0) ~~> (#vk.3, 0) ) )
+                qed
+              qed
+            next
+              case pub
+              step( solve( !KU( h(<~pw, random_challenge>) ) @ #vk.5 ) )
+                case User_response
+                MIRRORED
+              next
+                case c_h
+                by step( solve( !KU( ~pw ) @ #vk.7 ) )
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+next
+  case Rule_Password_guess
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !Own( pw ) ▶₀ #i ) )
+      case Password_init
+      MIRRORED
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !Own( pw ) ▶₀ #i ) )
+      case Password_init
+      MIRRORED
+    qed
+  qed
+next
+  case Rule_Password_init
+  backward-search
+    case LHS
+    step( simplify )
+    MIRRORED
+  next
+    case RHS
+    step( simplify )
+    MIRRORED
+  qed
+next
+  case Rule_Send
+  backward-search
+    case LHS
+    step( simplify )
+    MIRRORED
+  next
+    case RHS
+    step( simplify )
+    MIRRORED
+  qed
+next
+  case Rule_Server_challenge
+  backward-search
+    case LHS
+    step( simplify )
+    MIRRORED
+  next
+    case RHS
+    step( simplify )
+    MIRRORED
+  qed
+next
+  case Rule_Server_verify
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( Server_challenge_done( random_challenge, pw ) ▶₁ #i ) )
+      case Server_challenge
+      step( solve( !KU( h(<~pw, ~random_challenge>) ) @ #vk.2 ) )
+        case User_response
+        step( solve( !KU( ~random_challenge ) @ #vk.5 ) )
+          case Server_challenge
+          step( solve( !KU( '02' ) @ #vk.4 ) )
+            case coerce
+            step( solve( !KD( '02' ) ▶₀ #vk.4 ) )
+              case Password_guess
+              step( solve( !Own( t ) ▶₀ #vr.5 ) )
+                case Password_init
+                by step( contradiction /* impossible chain */ )
+              qed
+            next
+              case Server_challenge
+              by step( contradiction /* impossible chain */ )
+            next
+              case User_response
+              step( solve( (#vl.2, 0) ~~> (#vk.4, 0) ) )
+                case d_0_fst
+                by step( contradiction /* impossible chain */ )
+              next
+                case d_0_snd
+                by step( solve( (#vr.6, 0) ~~> (#vk.4, 0) ) )
+              qed
+            qed
+          next
+            case pub
+            step( solve( !KU( '01' ) @ #vk.5 ) )
+              case coerce
+              step( solve( !KD( '01' ) ▶₀ #vk.5 ) )
+                case Password_guess
+                step( solve( !Own( t ) ▶₀ #vr.5 ) )
+                  case Password_init
+                  by step( contradiction /* impossible chain */ )
+                qed
+              next
+                case Server_challenge
+                by step( contradiction /* impossible chain */ )
+              next
+                case User_response
+                by step( contradiction /* cyclic */ )
+              qed
+            next
+              case pub
+              MIRRORED
+            qed
+          qed
+        qed
+      next
+        case c_h
+        step( solve( !KU( ~pw ) @ #vk.4 ) )
+          case Password_guess
+          step( solve( !KU( ~random_challenge ) @ #vk.5 ) )
+            case Server_challenge
+            step( solve( !KU( '02' ) @ #vk.5 ) )
+              case coerce
+              step( solve( !KD( '02' ) ▶₀ #vk.5 ) )
+                case Password_guess
+                by step( contradiction /* impossible chain */ )
+              next
+                case Server_challenge
+                by step( contradiction /* impossible chain */ )
+              next
+                case User_response
+                step( solve( (#vl.2, 0) ~~> (#vk.5, 0) ) )
+                  case d_0_fst
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case d_0_snd
+                  by step( solve( (#vr.5, 0) ~~> (#vk.5, 0) ) )
+                qed
+              qed
+            next
+              case pub
+              by ATTACK // trace found
+            qed
+          qed
+        qed
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( Server_challenge_done( random_challenge, pw ) ▶₁ #i ) )
+      case Server_challenge
+      step( solve( !KU( h(<~pw, ~random_challenge>) ) @ #vk.2 ) )
+        case User_response
+        step( solve( !KU( ~random_challenge ) @ #vk.5 ) )
+          case Server_challenge
+          step( solve( !KU( '02' ) @ #vk.4 ) )
+            case coerce
+            step( solve( !KD( '02' ) ▶₀ #vk.4 ) )
+              case Password_guess
+              by step( contradiction /* impossible chain */ )
+            next
+              case Server_challenge
+              by step( contradiction /* impossible chain */ )
+            next
+              case User_response
+              step( solve( (#vl.2, 0) ~~> (#vk.4, 0) ) )
+                case d_0_fst
+                by step( contradiction /* impossible chain */ )
+              next
+                case d_0_snd
+                by step( solve( (#vr.6, 0) ~~> (#vk.4, 0) ) )
+              qed
+            qed
+          next
+            case pub
+            step( solve( !KU( '01' ) @ #vk.5 ) )
+              case coerce
+              step( solve( !KD( '01' ) ▶₀ #vk.5 ) )
+                case Password_guess
+                by step( contradiction /* impossible chain */ )
+              next
+                case Server_challenge
+                by step( contradiction /* impossible chain */ )
+              next
+                case User_response
+                by step( contradiction /* cyclic */ )
+              qed
+            next
+              case pub
+              MIRRORED
+            qed
+          qed
+        qed
+      next
+        case c_h
+        by step( solve( !KU( ~pw ) @ #vk.4 ) )
+      qed
+    qed
+  qed
+next
+  case Rule_User_response
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !Own( pw ) ▶₀ #i ) )
+      case Password_init
+      step( solve( !KU( '01' ) @ #vk.1 ) )
+        case coerce
+        step( solve( !KD( '01' ) ▶₀ #vk.1 ) )
+          case Password_guess
+          step( solve( !Own( t ) ▶₀ #vr.1 ) )
+            case Password_init
+            by step( contradiction /* impossible chain */ )
+          qed
+        next
+          case Server_challenge
+          by step( contradiction /* impossible chain */ )
+        next
+          case User_response
+          by step( contradiction /* cyclic */ )
+        qed
+      next
+        case pub
+        MIRRORED
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !Own( pw ) ▶₀ #i ) )
+      case Password_init
+      step( solve( !KU( '01' ) @ #vk.1 ) )
+        case coerce
+        step( solve( !KD( '01' ) ▶₀ #vk.1 ) )
+          case Password_guess
+          by step( contradiction /* impossible chain */ )
+        next
+          case Server_challenge
+          by step( contradiction /* impossible chain */ )
+        next
+          case User_response
+          by step( contradiction /* cyclic */ )
+        qed
+      next
+        case pub
+        MIRRORED
+      qed
+    qed
+  qed
+qed
+
+end

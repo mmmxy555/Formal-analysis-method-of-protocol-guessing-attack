@@ -1,0 +1,49 @@
+theory CHAP
+begin
+builtins:	hashing
+
+rule Password_init:
+    [ Fr(~pw) ]
+  --[ Init_pw_once() ]->
+    [ !Own(~pw) ]
+
+rule Server_challenge:
+  let
+    C1=<'01',~random_challenge>
+  in
+    [ !Own(pw),Fr(~random_challenge) ]
+  --[ S1() ]->
+    [ Out(C1),Server_challenge_done(~random_challenge,pw) ]
+
+rule User_response:
+  let
+    C2=<'02',h(pw,random_challenge)>
+  in
+    [ !Own(pw),In(<'01',random_challenge>) ]
+  --[ U1() ]->
+    [ Out(C2),User_response_done() ]
+    
+rule Server_verify:
+    [ In(<'02',hash>),Server_challenge_done(random_challenge,pw)]
+  --[ Eq(hash,h(pw,random_challenge)),Finish(pw) ]->
+    [ Finish(pw) ]
+
+rule Password_guess:
+    [ !Own(pw),Fr(~rc) ]
+  --[ Guess_once() ]->
+    [ Out(diff(pw,~rc)) ]
+
+restriction Verif:
+"
+    All x y #i. Eq(x,y) @ i ==> x = y
+"
+
+restriction Init:
+" 
+   All #i #j. Init_pw_once()@i & Init_pw_once()@j ==> #i=#j
+"
+restriction guess:
+" 
+   All #i #j. Guess_once()@i & Guess_once()@j ==> #i=#j
+"
+end

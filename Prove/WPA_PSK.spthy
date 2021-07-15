@@ -1,0 +1,2589 @@
+theory WPA begin
+
+// Function signature and definition of the equational theory E
+
+functions: HMAC_MD5/2, Len/1, Max/2, Min/2, SHA1_PRF/7, adec/2, aenc/2,
+           fst/1, pair/2, pdkdf2_SHA1/4, pk/1, snd/1
+equations:
+    adec(aenc(x.1, pk(x.2)), x.2) = x.1,
+    fst(<x.1, x.2>) = x.1,
+    snd(<x.1, x.2>) = x.2
+
+
+
+rule (modulo E) Password_init:
+   [ Fr( ~pw ) ] --[ Init_pw_once( ) ]-> [ !Own( ~pw ) ]
+
+rule (modulo E) AP_1:
+   [ !Own( pw ) ] --> [ Out( <'SSID', 'AP_MAC'> ), AP_state_1( pw ) ]
+
+rule (modulo E) STA_1:
+   [ !Own( pw ), Fr( ~SNonce ), In( <'SSID', 'AP_MAC'> ) ]
+  -->
+   [ Out( <~SNonce, 'STA_MAC'> ), STA_state_1( pw, ~SNonce ) ]
+
+rule (modulo E) AP_2:
+   [ AP_state_1( pw ), Fr( ~ANonce ), In( <SNonce, 'STA_MAC'> ) ]
+  -->
+   [ Out( ~ANonce ) ]
+
+rule (modulo E) STA_2:
+   [ STA_state_1( pw, SNonce ), In( ANonce ), Fr( ~data ) ]
+  -->
+   [
+   Out( <~data, 
+         HMAC_MD5(SHA1_PRF(pdkdf2_SHA1(pw, 'SSID', 'SSID_length', '4096'),
+                           Len(pdkdf2_SHA1(pw, 'SSID', 'SSID_length', '4096')),
+                           'Pairwise_key_expansion', Min('AP_MAC', 'STA_MAC'),
+                           Max('AP_MAC', 'STA_MAC'), Min(ANonce, SNonce), Max(ANonce, SNonce)),
+                  ~data)
+        >
+   )
+   ]
+
+rule (modulo E) Password_guess:
+   [ !Own( pw ), Fr( ~rc ) ] --[ Guess_once( ) ]-> [ Out( diff(pw, ~rc) ) ]
+
+restriction Init [right]:
+  "∀ #i #j. ((Init_pw_once( ) @ #i) ∧ (Init_pw_once( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction Init [left]:
+  "∀ #i #j. ((Init_pw_once( ) @ #i) ∧ (Init_pw_once( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction guess [right]:
+  "∀ #i #j. ((Guess_once( ) @ #i) ∧ (Guess_once( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction guess [left]:
+  "∀ #i #j. ((Guess_once( ) @ #i) ∧ (Guess_once( ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+/* All well-formedness checks were successful. */
+
+diffLemma Observational_equivalence:
+rule-equivalence
+  case Rule_AP_1
+  backward-search
+    case LHS
+    step( simplify )
+    MIRRORED
+  next
+    case RHS
+    step( simplify )
+    MIRRORED
+  qed
+next
+  case Rule_AP_2
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( AP_state_1( pw ) ▶₀ #i ) )
+      case AP_1
+      step( solve( !KU( 'STA_MAC' ) @ #vk.2 ) )
+        case coerce
+        step( solve( !KD( 'STA_MAC' ) ▶₀ #vk.1 ) )
+          case AP_1
+          by step( contradiction /* impossible chain */ )
+        next
+          case AP_2
+          by step( contradiction /* cyclic */ )
+        next
+          case Password_guess
+          step( solve( !Own( t ) ▶₀ #vr.2 ) )
+            case Password_init
+            by step( contradiction /* impossible chain */ )
+          qed
+        next
+          case STA_1
+          by step( contradiction /* impossible chain */ )
+        next
+          case STA_2
+          step( solve( (#vl, 0) ~~> (#vk.1, 0) ) )
+            case d_0_fst
+            by step( contradiction /* impossible chain */ )
+          next
+            case d_0_snd
+            by step( solve( (#vr.3, 0) ~~> (#vk.1, 0) ) )
+          qed
+        qed
+      next
+        case pub
+        MIRRORED
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( AP_state_1( pw ) ▶₀ #i ) )
+      case AP_1
+      step( solve( !KU( 'STA_MAC' ) @ #vk.2 ) )
+        case coerce
+        step( solve( !KD( 'STA_MAC' ) ▶₀ #vk.1 ) )
+          case AP_1
+          by step( contradiction /* impossible chain */ )
+        next
+          case AP_2
+          by step( contradiction /* cyclic */ )
+        next
+          case Password_guess
+          by step( contradiction /* impossible chain */ )
+        next
+          case STA_1
+          by step( contradiction /* impossible chain */ )
+        next
+          case STA_2
+          step( solve( (#vl, 0) ~~> (#vk.1, 0) ) )
+            case d_0_fst
+            by step( contradiction /* impossible chain */ )
+          next
+            case d_0_snd
+            by step( solve( (#vr.3, 0) ~~> (#vk.1, 0) ) )
+          qed
+        qed
+      next
+        case pub
+        MIRRORED
+      qed
+    qed
+  qed
+next
+  case Rule_Destrd_0_adec
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !KD( aenc(x, pk(x.1)) ) ▶₀ #i ) )
+      case AP_1
+      by step( contradiction /* impossible chain */ )
+    next
+      case AP_2
+      by step( contradiction /* impossible chain */ )
+    next
+      case Password_guess
+      step( solve( !Own( t ) ▶₀ #vr ) )
+        case Password_init
+        by step( contradiction /* impossible chain */ )
+      qed
+    next
+      case STA_1
+      by step( contradiction /* impossible chain */ )
+    next
+      case STA_2
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( solve( (#vr.1, 0) ~~> (#i, 0) ) )
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !KD( aenc(x, pk(x.1)) ) ▶₀ #i ) )
+      case AP_1
+      by step( contradiction /* impossible chain */ )
+    next
+      case AP_2
+      by step( contradiction /* impossible chain */ )
+    next
+      case Password_guess
+      by step( contradiction /* impossible chain */ )
+    next
+      case STA_1
+      by step( contradiction /* impossible chain */ )
+    next
+      case STA_2
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( solve( (#vr.1, 0) ~~> (#i, 0) ) )
+      qed
+    qed
+  qed
+next
+  case Rule_Destrd_0_fst
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !KD( <x, x.1> ) ▶₀ #i ) )
+      case AP_1
+      by step( contradiction /* impossible chain */ )
+    next
+      case AP_2
+      by step( contradiction /* impossible chain */ )
+    next
+      case Password_guess
+      step( solve( !Own( t ) ▶₀ #vr ) )
+        case Password_init
+        by step( contradiction /* impossible chain */ )
+      qed
+    next
+      case STA_1
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( contradiction /* impossible chain */ )
+      next
+        case pair
+        step( solve( !Own( pw ) ▶₀ #vr ) )
+          case Password_init
+          step( solve( !KU( 'SSID' ) @ #vk.1 ) )
+            case coerce
+            step( solve( !KD( 'SSID' ) ▶₀ #vk.1 ) )
+              case AP_1
+              by step( contradiction /* impossible chain */ )
+            next
+              case AP_2
+              by step( contradiction /* impossible chain */ )
+            next
+              case Password_guess
+              step( solve( !Own( t ) ▶₀ #vr.2 ) )
+                case Password_init
+                by step( contradiction /* impossible chain */ )
+              qed
+            next
+              case STA_1
+              by step( contradiction /* cyclic */ )
+            next
+              case STA_2
+              step( solve( (#vl.1, 0) ~~> (#vk.1, 0) ) )
+                case d_0_fst
+                by step( contradiction /* impossible chain */ )
+              next
+                case d_0_snd
+                by step( solve( (#vr.3, 0) ~~> (#vk.1, 0) ) )
+              qed
+            qed
+          next
+            case pub
+            step( solve( !KU( 'AP_MAC' ) @ #vk.2 ) )
+              case coerce
+              step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.2 ) )
+                case AP_1
+                by step( contradiction /* impossible chain */ )
+              next
+                case AP_2
+                by step( contradiction /* impossible chain */ )
+              next
+                case Password_guess
+                step( solve( !Own( t ) ▶₀ #vr.2 ) )
+                  case Password_init
+                  by step( contradiction /* impossible chain */ )
+                qed
+              next
+                case STA_1
+                by step( contradiction /* cyclic */ )
+              next
+                case STA_2
+                step( solve( (#vl.1, 0) ~~> (#vk.2, 0) ) )
+                  case d_0_fst
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case d_0_snd
+                  by step( solve( (#vr.3, 0) ~~> (#vk.2, 0) ) )
+                qed
+              qed
+            next
+              case pub
+              MIRRORED
+            qed
+          qed
+        qed
+      qed
+    next
+      case STA_2
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( solve( (#vr.1, 0) ~~> (#i, 0) ) )
+      next
+        case pair
+        MIRRORED
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !KD( <x, x.1> ) ▶₀ #i ) )
+      case AP_1
+      by step( contradiction /* impossible chain */ )
+    next
+      case AP_2
+      by step( contradiction /* impossible chain */ )
+    next
+      case Password_guess
+      by step( contradiction /* impossible chain */ )
+    next
+      case STA_1
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( contradiction /* impossible chain */ )
+      next
+        case pair
+        step( solve( !Own( pw ) ▶₀ #vr ) )
+          case Password_init
+          step( solve( !KU( 'SSID' ) @ #vk.1 ) )
+            case coerce
+            step( solve( !KD( 'SSID' ) ▶₀ #vk.1 ) )
+              case AP_1
+              by step( contradiction /* impossible chain */ )
+            next
+              case AP_2
+              by step( contradiction /* impossible chain */ )
+            next
+              case Password_guess
+              by step( contradiction /* impossible chain */ )
+            next
+              case STA_1
+              by step( contradiction /* cyclic */ )
+            next
+              case STA_2
+              step( solve( (#vl.1, 0) ~~> (#vk.1, 0) ) )
+                case d_0_fst
+                by step( contradiction /* impossible chain */ )
+              next
+                case d_0_snd
+                by step( solve( (#vr.3, 0) ~~> (#vk.1, 0) ) )
+              qed
+            qed
+          next
+            case pub
+            step( solve( !KU( 'AP_MAC' ) @ #vk.2 ) )
+              case coerce
+              step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.2 ) )
+                case AP_1
+                by step( contradiction /* impossible chain */ )
+              next
+                case AP_2
+                by step( contradiction /* impossible chain */ )
+              next
+                case Password_guess
+                by step( contradiction /* impossible chain */ )
+              next
+                case STA_1
+                by step( contradiction /* cyclic */ )
+              next
+                case STA_2
+                step( solve( (#vl.1, 0) ~~> (#vk.2, 0) ) )
+                  case d_0_fst
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case d_0_snd
+                  by step( solve( (#vr.3, 0) ~~> (#vk.2, 0) ) )
+                qed
+              qed
+            next
+              case pub
+              MIRRORED
+            qed
+          qed
+        qed
+      qed
+    next
+      case STA_2
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( solve( (#vr.1, 0) ~~> (#i, 0) ) )
+      next
+        case pair
+        MIRRORED
+      qed
+    qed
+  qed
+next
+  case Rule_Destrd_0_snd
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !KD( <x, x.1> ) ▶₀ #i ) )
+      case AP_1
+      by step( contradiction /* impossible chain */ )
+    next
+      case AP_2
+      by step( contradiction /* impossible chain */ )
+    next
+      case Password_guess
+      step( solve( !Own( t ) ▶₀ #vr ) )
+        case Password_init
+        by step( contradiction /* impossible chain */ )
+      qed
+    next
+      case STA_1
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( contradiction /* impossible chain */ )
+      next
+        case pair
+        step( solve( !Own( pw ) ▶₀ #vr ) )
+          case Password_init
+          step( solve( !KU( 'SSID' ) @ #vk.1 ) )
+            case coerce
+            step( solve( !KD( 'SSID' ) ▶₀ #vk.1 ) )
+              case AP_1
+              by step( contradiction /* impossible chain */ )
+            next
+              case AP_2
+              by step( contradiction /* impossible chain */ )
+            next
+              case Password_guess
+              step( solve( !Own( t ) ▶₀ #vr.2 ) )
+                case Password_init
+                by step( contradiction /* impossible chain */ )
+              qed
+            next
+              case STA_1
+              by step( contradiction /* cyclic */ )
+            next
+              case STA_2
+              step( solve( (#vl.1, 0) ~~> (#vk.1, 0) ) )
+                case d_0_fst
+                by step( contradiction /* impossible chain */ )
+              next
+                case d_0_snd
+                by step( solve( (#vr.3, 0) ~~> (#vk.1, 0) ) )
+              qed
+            qed
+          next
+            case pub
+            step( solve( !KU( 'AP_MAC' ) @ #vk.2 ) )
+              case coerce
+              step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.2 ) )
+                case AP_1
+                by step( contradiction /* impossible chain */ )
+              next
+                case AP_2
+                by step( contradiction /* impossible chain */ )
+              next
+                case Password_guess
+                step( solve( !Own( t ) ▶₀ #vr.2 ) )
+                  case Password_init
+                  by step( contradiction /* impossible chain */ )
+                qed
+              next
+                case STA_1
+                by step( contradiction /* cyclic */ )
+              next
+                case STA_2
+                step( solve( (#vl.1, 0) ~~> (#vk.2, 0) ) )
+                  case d_0_fst
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case d_0_snd
+                  by step( solve( (#vr.3, 0) ~~> (#vk.2, 0) ) )
+                qed
+              qed
+            next
+              case pub
+              MIRRORED
+            qed
+          qed
+        qed
+      qed
+    next
+      case STA_2
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( solve( (#vr.1, 0) ~~> (#i, 0) ) )
+      next
+        case pair
+        MIRRORED
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !KD( <x, x.1> ) ▶₀ #i ) )
+      case AP_1
+      by step( contradiction /* impossible chain */ )
+    next
+      case AP_2
+      by step( contradiction /* impossible chain */ )
+    next
+      case Password_guess
+      by step( contradiction /* impossible chain */ )
+    next
+      case STA_1
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( contradiction /* impossible chain */ )
+      next
+        case pair
+        step( solve( !Own( pw ) ▶₀ #vr ) )
+          case Password_init
+          step( solve( !KU( 'SSID' ) @ #vk.1 ) )
+            case coerce
+            step( solve( !KD( 'SSID' ) ▶₀ #vk.1 ) )
+              case AP_1
+              by step( contradiction /* impossible chain */ )
+            next
+              case AP_2
+              by step( contradiction /* impossible chain */ )
+            next
+              case Password_guess
+              by step( contradiction /* impossible chain */ )
+            next
+              case STA_1
+              by step( contradiction /* cyclic */ )
+            next
+              case STA_2
+              step( solve( (#vl.1, 0) ~~> (#vk.1, 0) ) )
+                case d_0_fst
+                by step( contradiction /* impossible chain */ )
+              next
+                case d_0_snd
+                by step( solve( (#vr.3, 0) ~~> (#vk.1, 0) ) )
+              qed
+            qed
+          next
+            case pub
+            step( solve( !KU( 'AP_MAC' ) @ #vk.2 ) )
+              case coerce
+              step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.2 ) )
+                case AP_1
+                by step( contradiction /* impossible chain */ )
+              next
+                case AP_2
+                by step( contradiction /* impossible chain */ )
+              next
+                case Password_guess
+                by step( contradiction /* impossible chain */ )
+              next
+                case STA_1
+                by step( contradiction /* cyclic */ )
+              next
+                case STA_2
+                step( solve( (#vl.1, 0) ~~> (#vk.2, 0) ) )
+                  case d_0_fst
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case d_0_snd
+                  by step( solve( (#vr.3, 0) ~~> (#vk.2, 0) ) )
+                qed
+              qed
+            next
+              case pub
+              MIRRORED
+            qed
+          qed
+        qed
+      qed
+    next
+      case STA_2
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( solve( (#vr.1, 0) ~~> (#i, 0) ) )
+      next
+        case pair
+        MIRRORED
+      qed
+    qed
+  qed
+next
+  case Rule_Equality
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !KD( x ) ▶₁ #i ) )
+      case AP_1
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case d_0_fst
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case Const_pub_SSID
+          step( solve( !Own( pw ) ▶₀ #vr ) )
+            case Password_init
+            step( solve( !KU( 'SSID' ) @ #vk ) )
+              case coerce
+              step( solve( !KD( 'SSID' ) ▶₀ #vk ) )
+                case AP_1
+                by step( contradiction /* impossible chain */ )
+              next
+                case AP_2
+                by step( contradiction /* impossible chain */ )
+              next
+                case Password_guess
+                step( solve( !Own( t ) ▶₀ #vr.3 ) )
+                  case Password_init
+                  by step( contradiction /* impossible chain */ )
+                qed
+              next
+                case STA_1
+                by step( contradiction /* cyclic */ )
+              next
+                case STA_2
+                step( solve( (#vl.1, 0) ~~> (#vk, 0) ) )
+                  case d_0_fst
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case d_0_snd
+                  by step( solve( (#vr.4, 0) ~~> (#vk, 0) ) )
+                qed
+              qed
+            next
+              case pub
+              MIRRORED
+            qed
+          qed
+        qed
+      next
+        case d_0_snd
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case Const_pub_AP_MAC
+          step( solve( !Own( pw ) ▶₀ #vr ) )
+            case Password_init
+            step( solve( !KU( 'AP_MAC' ) @ #vk ) )
+              case coerce
+              step( solve( !KD( 'AP_MAC' ) ▶₀ #vk ) )
+                case AP_1
+                by step( contradiction /* impossible chain */ )
+              next
+                case AP_2
+                by step( contradiction /* impossible chain */ )
+              next
+                case Password_guess
+                step( solve( !Own( t ) ▶₀ #vr.3 ) )
+                  case Password_init
+                  by step( contradiction /* impossible chain */ )
+                qed
+              next
+                case STA_1
+                by step( contradiction /* cyclic */ )
+              next
+                case STA_2
+                step( solve( (#vl.1, 0) ~~> (#vk, 0) ) )
+                  case d_0_fst
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case d_0_snd
+                  by step( solve( (#vr.4, 0) ~~> (#vk, 0) ) )
+                qed
+              qed
+            next
+              case pub
+              MIRRORED
+            qed
+          qed
+        qed
+      next
+        case pair
+        step( solve( !Own( pw ) ▶₀ #vr ) )
+          case Password_init
+          step( solve( !KU( 'SSID' ) @ #vk.1 ) )
+            case coerce
+            step( solve( !KD( 'SSID' ) ▶₀ #vk.1 ) )
+              case AP_1
+              by step( contradiction /* impossible chain */ )
+            next
+              case AP_2
+              by step( contradiction /* impossible chain */ )
+            next
+              case Password_guess
+              step( solve( !Own( t ) ▶₀ #vr.2 ) )
+                case Password_init
+                by step( contradiction /* impossible chain */ )
+              qed
+            next
+              case STA_1
+              by step( contradiction /* cyclic */ )
+            next
+              case STA_2
+              step( solve( (#vl.1, 0) ~~> (#vk.1, 0) ) )
+                case d_0_fst
+                by step( contradiction /* impossible chain */ )
+              next
+                case d_0_snd
+                by step( solve( (#vr.3, 0) ~~> (#vk.1, 0) ) )
+              qed
+            qed
+          next
+            case pub
+            step( solve( !KU( 'AP_MAC' ) @ #vk.2 ) )
+              case coerce
+              step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.2 ) )
+                case AP_1
+                by step( contradiction /* impossible chain */ )
+              next
+                case AP_2
+                by step( contradiction /* impossible chain */ )
+              next
+                case Password_guess
+                step( solve( !Own( t ) ▶₀ #vr.2 ) )
+                  case Password_init
+                  by step( contradiction /* impossible chain */ )
+                qed
+              next
+                case STA_1
+                by step( contradiction /* cyclic */ )
+              next
+                case STA_2
+                step( solve( (#vl.1, 0) ~~> (#vk.2, 0) ) )
+                  case d_0_fst
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case d_0_snd
+                  by step( solve( (#vr.3, 0) ~~> (#vk.2, 0) ) )
+                qed
+              qed
+            next
+              case pub
+              MIRRORED
+            qed
+          qed
+        qed
+      qed
+    next
+      case AP_2
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case Var_fresh_ANonce
+        step( solve( AP_state_1( pw ) ▶₀ #vr ) )
+          case AP_1
+          step( solve( !KU( ~ANonce ) @ #vk.1 ) )
+            case AP_2
+            step( solve( !KU( 'STA_MAC' ) @ #vk.3 ) )
+              case coerce
+              step( solve( !KD( 'STA_MAC' ) ▶₀ #vk.2 ) )
+                case AP_1
+                by step( contradiction /* impossible chain */ )
+              next
+                case AP_2
+                by step( contradiction /* cyclic */ )
+              next
+                case Password_guess
+                step( solve( !Own( t ) ▶₀ #vr.3 ) )
+                  case Password_init
+                  by step( contradiction /* impossible chain */ )
+                qed
+              next
+                case STA_1
+                by step( contradiction /* impossible chain */ )
+              next
+                case STA_2
+                step( solve( (#vl.1, 0) ~~> (#vk.2, 0) ) )
+                  case d_0_fst
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case d_0_snd
+                  by step( solve( (#vr.4, 0) ~~> (#vk.2, 0) ) )
+                qed
+              qed
+            next
+              case pub
+              MIRRORED
+            qed
+          qed
+        qed
+      qed
+    next
+      case Password_guess
+      step( solve( !Own( t ) ▶₀ #vr ) )
+        case Password_init
+        step( solve( (#vl, 0) ~~> (#i, 1) ) )
+          case Var_fresh_pw
+          step( solve( !KU( ~pw ) @ #vk ) )
+            case Password_guess
+            MIRRORED
+          qed
+        qed
+      qed
+    next
+      case STA_1
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case d_0_fst
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case Var_fresh_SNonce
+          step( solve( !Own( pw ) ▶₀ #vr ) )
+            case Password_init
+            step( solve( !KU( ~SNonce ) @ #vk.1 ) )
+              case STA_1
+              step( solve( !KU( 'SSID' ) @ #vk.2 ) )
+                case coerce
+                step( solve( !KD( 'SSID' ) ▶₀ #vk.2 ) )
+                  case AP_1
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case AP_2
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case Password_guess
+                  step( solve( !Own( t ) ▶₀ #vr.4 ) )
+                    case Password_init
+                    by step( contradiction /* impossible chain */ )
+                  qed
+                next
+                  case STA_1
+                  by step( contradiction /* cyclic */ )
+                next
+                  case STA_2
+                  step( solve( (#vl.1, 0) ~~> (#vk.2, 0) ) )
+                    case d_0_fst
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case d_0_snd
+                    by step( solve( (#vr.5, 0) ~~> (#vk.2, 0) ) )
+                  qed
+                qed
+              next
+                case pub
+                step( solve( !KU( 'AP_MAC' ) @ #vk.3 ) )
+                  case coerce
+                  step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.3 ) )
+                    case AP_1
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case AP_2
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case Password_guess
+                    step( solve( !Own( t ) ▶₀ #vr.4 ) )
+                      case Password_init
+                      by step( contradiction /* impossible chain */ )
+                    qed
+                  next
+                    case STA_1
+                    by step( contradiction /* cyclic */ )
+                  next
+                    case STA_2
+                    step( solve( (#vl.1, 0) ~~> (#vk.3, 0) ) )
+                      case d_0_fst
+                      by step( contradiction /* impossible chain */ )
+                    next
+                      case d_0_snd
+                      by step( solve( (#vr.5, 0) ~~> (#vk.3, 0) ) )
+                    qed
+                  qed
+                next
+                  case pub
+                  MIRRORED
+                qed
+              qed
+            qed
+          qed
+        qed
+      next
+        case d_0_snd
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case Const_pub_STA_MAC
+          step( solve( !Own( pw ) ▶₀ #vr ) )
+            case Password_init
+            step( solve( !KU( 'SSID' ) @ #vk.2 ) )
+              case coerce
+              step( solve( !KD( 'SSID' ) ▶₀ #vk.1 ) )
+                case AP_1
+                by step( contradiction /* impossible chain */ )
+              next
+                case AP_2
+                by step( contradiction /* impossible chain */ )
+              next
+                case Password_guess
+                step( solve( !Own( t ) ▶₀ #vr.3 ) )
+                  case Password_init
+                  by step( contradiction /* impossible chain */ )
+                qed
+              next
+                case STA_1
+                by step( contradiction /* cyclic */ )
+              next
+                case STA_2
+                step( solve( (#vl.1, 0) ~~> (#vk.1, 0) ) )
+                  case d_0_fst
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case d_0_snd
+                  by step( solve( (#vr.4, 0) ~~> (#vk.1, 0) ) )
+                qed
+              qed
+            next
+              case pub
+              step( solve( !KU( 'AP_MAC' ) @ #vk.3 ) )
+                case coerce
+                step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.2 ) )
+                  case AP_1
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case AP_2
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case Password_guess
+                  step( solve( !Own( t ) ▶₀ #vr.3 ) )
+                    case Password_init
+                    by step( contradiction /* impossible chain */ )
+                  qed
+                next
+                  case STA_1
+                  by step( contradiction /* cyclic */ )
+                next
+                  case STA_2
+                  step( solve( (#vl.1, 0) ~~> (#vk.2, 0) ) )
+                    case d_0_fst
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case d_0_snd
+                    by step( solve( (#vr.4, 0) ~~> (#vk.2, 0) ) )
+                  qed
+                qed
+              next
+                case pub
+                step( solve( !KU( 'STA_MAC' ) @ #vk.3 ) )
+                  case coerce
+                  step( solve( !KD( 'STA_MAC' ) ▶₀ #vk.3 ) )
+                    case AP_1
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case AP_2
+                    by step( contradiction /* cyclic */ )
+                  next
+                    case Password_guess
+                    step( solve( !Own( t ) ▶₀ #vr.3 ) )
+                      case Password_init
+                      by step( contradiction /* impossible chain */ )
+                    qed
+                  next
+                    case STA_1
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case STA_2
+                    step( solve( (#vl.1, 0) ~~> (#vk.3, 0) ) )
+                      case d_0_fst
+                      by step( contradiction /* impossible chain */ )
+                    next
+                      case d_0_snd
+                      by step( solve( (#vr.4, 0) ~~> (#vk.3, 0) ) )
+                    qed
+                  qed
+                next
+                  case pub
+                  MIRRORED
+                qed
+              qed
+            qed
+          qed
+        qed
+      next
+        case pair
+        step( solve( !Own( pw ) ▶₀ #vr ) )
+          case Password_init
+          step( solve( !KU( ~SNonce ) @ #vk.4 ) )
+            case STA_1
+            step( solve( !KU( 'SSID' ) @ #vk.3 ) )
+              case coerce
+              step( solve( !KD( 'SSID' ) ▶₀ #vk.3 ) )
+                case AP_1
+                by step( contradiction /* impossible chain */ )
+              next
+                case AP_2
+                by step( contradiction /* impossible chain */ )
+              next
+                case Password_guess
+                step( solve( !Own( t ) ▶₀ #vr.3 ) )
+                  case Password_init
+                  by step( contradiction /* impossible chain */ )
+                qed
+              next
+                case STA_1
+                by step( contradiction /* cyclic */ )
+              next
+                case STA_2
+                step( solve( (#vl.1, 0) ~~> (#vk.3, 0) ) )
+                  case d_0_fst
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case d_0_snd
+                  by step( solve( (#vr.4, 0) ~~> (#vk.3, 0) ) )
+                qed
+              qed
+            next
+              case pub
+              step( solve( !KU( 'AP_MAC' ) @ #vk.4 ) )
+                case coerce
+                step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.4 ) )
+                  case AP_1
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case AP_2
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case Password_guess
+                  step( solve( !Own( t ) ▶₀ #vr.3 ) )
+                    case Password_init
+                    by step( contradiction /* impossible chain */ )
+                  qed
+                next
+                  case STA_1
+                  by step( contradiction /* cyclic */ )
+                next
+                  case STA_2
+                  step( solve( (#vl.1, 0) ~~> (#vk.4, 0) ) )
+                    case d_0_fst
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case d_0_snd
+                    by step( solve( (#vr.4, 0) ~~> (#vk.4, 0) ) )
+                  qed
+                qed
+              next
+                case pub
+                step( solve( !KU( 'STA_MAC' ) @ #vk.5 ) )
+                  case coerce
+                  step( solve( !KD( 'STA_MAC' ) ▶₀ #vk.5 ) )
+                    case AP_1
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case AP_2
+                    by step( contradiction /* cyclic */ )
+                  next
+                    case Password_guess
+                    step( solve( !Own( t ) ▶₀ #vr.3 ) )
+                      case Password_init
+                      by step( contradiction /* impossible chain */ )
+                    qed
+                  next
+                    case STA_1
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case STA_2
+                    step( solve( (#vl.1, 0) ~~> (#vk.5, 0) ) )
+                      case d_0_fst
+                      by step( contradiction /* impossible chain */ )
+                    next
+                      case d_0_snd
+                      by step( solve( (#vr.4, 0) ~~> (#vk.5, 0) ) )
+                    qed
+                  qed
+                next
+                  case pub
+                  MIRRORED
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    next
+      case STA_2
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case d_0_fst
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case Var_fresh_data
+          step( solve( STA_state_1( pw, SNonce ) ▶₀ #vr ) )
+            case STA_1
+            step( solve( !KU( ~data ) @ #vk.1 ) )
+              case STA_2
+              step( solve( !KU( 'SSID' ) @ #vk.3 ) )
+                case coerce
+                step( solve( !KD( 'SSID' ) ▶₀ #vk.2 ) )
+                  case AP_1
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case AP_2
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case Password_guess
+                  step( solve( !Own( t ) ▶₀ #vr.5 ) )
+                    case Password_init
+                    by step( contradiction /* impossible chain */ )
+                  qed
+                next
+                  case STA_1
+                  by step( contradiction /* cyclic */ )
+                next
+                  case STA_2
+                  step( solve( (#vl.1, 0) ~~> (#vk.2, 0) ) )
+                    case d_0_fst
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case d_0_snd
+                    by step( solve( (#vr.6, 0) ~~> (#vk.2, 0) ) )
+                  qed
+                qed
+              next
+                case pub
+                step( solve( !KU( 'AP_MAC' ) @ #vk.4 ) )
+                  case coerce
+                  step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.3 ) )
+                    case AP_1
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case AP_2
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case Password_guess
+                    step( solve( !Own( t ) ▶₀ #vr.5 ) )
+                      case Password_init
+                      by step( contradiction /* impossible chain */ )
+                    qed
+                  next
+                    case STA_1
+                    by step( contradiction /* cyclic */ )
+                  next
+                    case STA_2
+                    step( solve( (#vl.1, 0) ~~> (#vk.3, 0) ) )
+                      case d_0_fst
+                      by step( contradiction /* impossible chain */ )
+                    next
+                      case d_0_snd
+                      by step( solve( (#vr.6, 0) ~~> (#vk.3, 0) ) )
+                    qed
+                  qed
+                next
+                  case pub
+                  MIRRORED
+                qed
+              qed
+            qed
+          qed
+        qed
+      next
+        case d_0_snd
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case HMAC_MD5
+          step( solve( STA_state_1( pw, SNonce ) ▶₀ #vr ) )
+            case STA_1
+            step( solve( !KU( HMAC_MD5(SHA1_PRF(pdkdf2_SHA1(~pw, 'SSID',
+                                                            'SSID_length', '4096'),
+                                                Len(pdkdf2_SHA1(~pw, 'SSID', 'SSID_length', '4096')),
+                                                'Pairwise_key_expansion', Min('AP_MAC', 'STA_MAC'),
+                                                Max('AP_MAC', 'STA_MAC'), Min(ANonce, ~SNonce),
+                                                Max(ANonce, ~SNonce)),
+                                       ~data)
+                         ) @ #vk.1 ) )
+              case STA_2
+              step( solve( !KU( 'SSID' ) @ #vk.3 ) )
+                case coerce
+                step( solve( !KD( 'SSID' ) ▶₀ #vk.2 ) )
+                  case AP_1
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case AP_2
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case Password_guess
+                  step( solve( !Own( t ) ▶₀ #vr.5 ) )
+                    case Password_init
+                    by step( contradiction /* impossible chain */ )
+                  qed
+                next
+                  case STA_1
+                  by step( contradiction /* cyclic */ )
+                next
+                  case STA_2
+                  step( solve( (#vl.1, 0) ~~> (#vk.2, 0) ) )
+                    case d_0_fst
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case d_0_snd
+                    by step( solve( (#vr.6, 0) ~~> (#vk.2, 0) ) )
+                  qed
+                qed
+              next
+                case pub
+                step( solve( !KU( 'AP_MAC' ) @ #vk.4 ) )
+                  case coerce
+                  step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.3 ) )
+                    case AP_1
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case AP_2
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case Password_guess
+                    step( solve( !Own( t ) ▶₀ #vr.5 ) )
+                      case Password_init
+                      by step( contradiction /* impossible chain */ )
+                    qed
+                  next
+                    case STA_1
+                    by step( contradiction /* cyclic */ )
+                  next
+                    case STA_2
+                    step( solve( (#vl.1, 0) ~~> (#vk.3, 0) ) )
+                      case d_0_fst
+                      by step( contradiction /* impossible chain */ )
+                    next
+                      case d_0_snd
+                      by step( solve( (#vr.6, 0) ~~> (#vk.3, 0) ) )
+                    qed
+                  qed
+                next
+                  case pub
+                  MIRRORED
+                qed
+              qed
+            next
+              case c_HMAC_MD5
+              step( solve( !KU( SHA1_PRF(pdkdf2_SHA1(~pw, 'SSID', 'SSID_length',
+                                                     '4096'),
+                                         Len(pdkdf2_SHA1(~pw, 'SSID', 'SSID_length', '4096')),
+                                         'Pairwise_key_expansion', Min('AP_MAC', 'STA_MAC'),
+                                         Max('AP_MAC', 'STA_MAC'), Min(ANonce, ~SNonce), Max(ANonce, ~SNonce))
+                           ) @ #vk.5 ) )
+                case c_SHA1_PRF
+                step( solve( !KU( pdkdf2_SHA1(~pw, 'SSID', 'SSID_length', '4096')
+                             ) @ #vk.7 ) )
+                  case c_pdkdf2_SHA1
+                  step( solve( !KU( ~pw ) @ #vk.14 ) )
+                    case Password_guess
+                    step( solve( !KU( Len(pdkdf2_SHA1(~pw, 'SSID', 'SSID_length', '4096'))
+                                 ) @ #vk.9 ) )
+                      case c_Len
+                      step( solve( !KU( Min(ANonce, ~SNonce) ) @ #vk.13 ) )
+                        case c_Min
+                        step( solve( !KU( Max(ANonce, ~SNonce) ) @ #vk.14 ) )
+                          case c_Max
+                          step( solve( !KU( ~data ) @ #vk.11 ) )
+                            case STA_2
+                            step( solve( !KU( ~SNonce ) @ #vk.17 ) )
+                              case STA_1
+                              step( solve( !KU( Min('AP_MAC', 'STA_MAC') ) @ #vk.14 ) )
+                                case c_Min
+                                step( solve( !KU( Max('AP_MAC', 'STA_MAC') ) @ #vk.15 ) )
+                                  case c_Max
+                                  step( solve( !KU( 'SSID' ) @ #vk.13 ) )
+                                    case coerce
+                                    step( solve( !KD( 'SSID' ) ▶₀ #vk.12 ) )
+                                      case AP_1
+                                      by step( contradiction /* impossible chain */ )
+                                    next
+                                      case AP_2
+                                      by step( contradiction /* impossible chain */ )
+                                    next
+                                      case Password_guess
+                                      by step( contradiction /* impossible chain */ )
+                                    next
+                                      case STA_1
+                                      by step( contradiction /* cyclic */ )
+                                    next
+                                      case STA_2
+                                      step( solve( (#vl.3, 0) ~~> (#vk.12, 0) ) )
+                                        case d_0_fst
+                                        by step( contradiction /* impossible chain */ )
+                                      next
+                                        case d_0_snd
+                                        by step( solve( (#vr.8, 0) ~~> (#vk.12, 0) ) )
+                                      qed
+                                    qed
+                                  next
+                                    case pub
+                                    step( solve( !KU( 'AP_MAC' ) @ #vk.14 ) )
+                                      case coerce
+                                      step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.13 ) )
+                                        case AP_1
+                                        by step( contradiction /* impossible chain */ )
+                                      next
+                                        case AP_2
+                                        by step( contradiction /* impossible chain */ )
+                                      next
+                                        case Password_guess
+                                        by step( contradiction /* impossible chain */ )
+                                      next
+                                        case STA_1
+                                        by step( contradiction /* cyclic */ )
+                                      next
+                                        case STA_2
+                                        step( solve( (#vl.3, 0) ~~> (#vk.13, 0) ) )
+                                          case d_0_fst
+                                          by step( contradiction /* impossible chain */ )
+                                        next
+                                          case d_0_snd
+                                          by step( solve( (#vr.8, 0) ~~> (#vk.13, 0) ) )
+                                        qed
+                                      qed
+                                    next
+                                      case pub
+                                      step( solve( !KU( 'Pairwise_key_expansion' ) @ #vk.15 ) )
+                                        case coerce
+                                        step( solve( !KD( 'Pairwise_key_expansion' ) ▶₀ #vk.14 ) )
+                                          case AP_1
+                                          by step( contradiction /* impossible chain */ )
+                                        next
+                                          case AP_2
+                                          by step( contradiction /* impossible chain */ )
+                                        next
+                                          case Password_guess
+                                          by step( contradiction /* impossible chain */ )
+                                        next
+                                          case STA_1
+                                          by step( contradiction /* impossible chain */ )
+                                        next
+                                          case STA_2
+                                          step( solve( (#vl.3, 0) ~~> (#vk.14, 0) ) )
+                                            case d_0_fst
+                                            by step( contradiction /* impossible chain */ )
+                                          next
+                                            case d_0_snd
+                                            by step( solve( (#vr.8, 0) ~~> (#vk.14, 0) ) )
+                                          qed
+                                        qed
+                                      next
+                                        case pub
+                                        step( solve( !KU( 'SSID_length' ) @ #vk.16 ) )
+                                          case coerce
+                                          step( solve( !KD( 'SSID_length' ) ▶₀ #vk.15 ) )
+                                            case AP_1
+                                            by step( contradiction /* impossible chain */ )
+                                          next
+                                            case AP_2
+                                            by step( contradiction /* impossible chain */ )
+                                          next
+                                            case Password_guess
+                                            by step( contradiction /* impossible chain */ )
+                                          next
+                                            case STA_1
+                                            by step( contradiction /* impossible chain */ )
+                                          next
+                                            case STA_2
+                                            step( solve( (#vl.3, 0) ~~> (#vk.15, 0) ) )
+                                              case d_0_fst
+                                              by step( contradiction /* impossible chain */ )
+                                            next
+                                              case d_0_snd
+                                              by step( solve( (#vr.8, 0) ~~> (#vk.15, 0) ) )
+                                            qed
+                                          qed
+                                        next
+                                          case pub
+                                          step( solve( !KU( '4096' ) @ #vk.17 ) )
+                                            case coerce
+                                            step( solve( !KD( '4096' ) ▶₀ #vk.16 ) )
+                                              case AP_1
+                                              by step( contradiction /* impossible chain */ )
+                                            next
+                                              case AP_2
+                                              by step( contradiction /* impossible chain */ )
+                                            next
+                                              case Password_guess
+                                              by step( contradiction /* impossible chain */ )
+                                            next
+                                              case STA_1
+                                              by step( contradiction /* impossible chain */ )
+                                            next
+                                              case STA_2
+                                              step( solve( (#vl.3, 0) ~~> (#vk.16, 0) ) )
+                                                case d_0_fst
+                                                by step( contradiction /* impossible chain */ )
+                                              next
+                                                case d_0_snd
+                                                by step( solve( (#vr.8, 0) ~~> (#vk.16, 0) ) )
+                                              qed
+                                            qed
+next
+  case pub
+  step( solve( !KU( 'STA_MAC' ) @ #vk.18 ) )
+    case coerce
+    step( solve( !KD( 'STA_MAC' ) ▶₀ #vk.17 ) )
+      case AP_1
+      by step( contradiction /* impossible chain */ )
+    next
+      case AP_2
+      by step( contradiction /* cyclic */ )
+    next
+      case Password_guess
+      by step( contradiction /* impossible chain */ )
+    next
+      case STA_1
+      by step( contradiction /* impossible chain */ )
+    next
+      case STA_2
+      step( solve( (#vl.3, 0) ~~> (#vk.17, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( solve( (#vr.8, 0) ~~> (#vk.17, 0) ) )
+      qed
+    qed
+  next
+    case pub
+    by ATTACK // trace found
+  qed
+qed
+                                        qed
+                                      qed
+                                    qed
+                                  qed
+                                qed
+                              qed
+                            qed
+                          qed
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      next
+        case pair
+        step( solve( STA_state_1( pw, SNonce ) ▶₀ #vr ) )
+          case STA_1
+          step( solve( !KU( ~data ) @ #vk.3 ) )
+            case STA_2
+            step( solve( !KU( HMAC_MD5(SHA1_PRF(pdkdf2_SHA1(~pw, 'SSID',
+                                                            'SSID_length', '4096'),
+                                                Len(pdkdf2_SHA1(~pw, 'SSID', 'SSID_length', '4096')),
+                                                'Pairwise_key_expansion', Min('AP_MAC', 'STA_MAC'),
+                                                Max('AP_MAC', 'STA_MAC'), Min(ANonce, ~SNonce),
+                                                Max(ANonce, ~SNonce)),
+                                       ~data)
+                         ) @ #vk.4 ) )
+              case STA_2
+              step( solve( !KU( 'SSID' ) @ #vk.5 ) )
+                case coerce
+                step( solve( !KD( 'SSID' ) ▶₀ #vk.4 ) )
+                  case AP_1
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case AP_2
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case Password_guess
+                  step( solve( !Own( t ) ▶₀ #vr.5 ) )
+                    case Password_init
+                    by step( contradiction /* impossible chain */ )
+                  qed
+                next
+                  case STA_1
+                  by step( contradiction /* cyclic */ )
+                next
+                  case STA_2
+                  step( solve( (#vl.1, 0) ~~> (#vk.4, 0) ) )
+                    case d_0_fst
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case d_0_snd
+                    by step( solve( (#vr.6, 0) ~~> (#vk.4, 0) ) )
+                  qed
+                qed
+              next
+                case pub
+                step( solve( !KU( 'AP_MAC' ) @ #vk.6 ) )
+                  case coerce
+                  step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.5 ) )
+                    case AP_1
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case AP_2
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case Password_guess
+                    step( solve( !Own( t ) ▶₀ #vr.5 ) )
+                      case Password_init
+                      by step( contradiction /* impossible chain */ )
+                    qed
+                  next
+                    case STA_1
+                    by step( contradiction /* cyclic */ )
+                  next
+                    case STA_2
+                    step( solve( (#vl.1, 0) ~~> (#vk.5, 0) ) )
+                      case d_0_fst
+                      by step( contradiction /* impossible chain */ )
+                    next
+                      case d_0_snd
+                      by step( solve( (#vr.6, 0) ~~> (#vk.5, 0) ) )
+                    qed
+                  qed
+                next
+                  case pub
+                  MIRRORED
+                qed
+              qed
+            next
+              case c_HMAC_MD5
+              step( solve( !KU( SHA1_PRF(pdkdf2_SHA1(~pw, 'SSID', 'SSID_length',
+                                                     '4096'),
+                                         Len(pdkdf2_SHA1(~pw, 'SSID', 'SSID_length', '4096')),
+                                         'Pairwise_key_expansion', Min('AP_MAC', 'STA_MAC'),
+                                         Max('AP_MAC', 'STA_MAC'), Min(ANonce, ~SNonce), Max(ANonce, ~SNonce))
+                           ) @ #vk.7 ) )
+                case c_SHA1_PRF
+                step( solve( !KU( pdkdf2_SHA1(~pw, 'SSID', 'SSID_length', '4096')
+                             ) @ #vk.8 ) )
+                  case c_pdkdf2_SHA1
+                  step( solve( !KU( ~pw ) @ #vk.15 ) )
+                    case Password_guess
+                    step( solve( !KU( Len(pdkdf2_SHA1(~pw, 'SSID', 'SSID_length', '4096'))
+                                 ) @ #vk.10 ) )
+                      case c_Len
+                      step( solve( !KU( Min(ANonce, ~SNonce) ) @ #vk.14 ) )
+                        case c_Min
+                        step( solve( !KU( Max(ANonce, ~SNonce) ) @ #vk.15 ) )
+                          case c_Max
+                          step( solve( !KU( ~SNonce ) @ #vk.18 ) )
+                            case STA_1
+                            step( solve( !KU( Min('AP_MAC', 'STA_MAC') ) @ #vk.15 ) )
+                              case c_Min
+                              step( solve( !KU( Max('AP_MAC', 'STA_MAC') ) @ #vk.16 ) )
+                                case c_Max
+                                step( solve( !KU( 'SSID' ) @ #vk.14 ) )
+                                  case coerce
+                                  step( solve( !KD( 'SSID' ) ▶₀ #vk.13 ) )
+                                    case AP_1
+                                    by step( contradiction /* impossible chain */ )
+                                  next
+                                    case AP_2
+                                    by step( contradiction /* impossible chain */ )
+                                  next
+                                    case Password_guess
+                                    by step( contradiction /* impossible chain */ )
+                                  next
+                                    case STA_1
+                                    by step( contradiction /* cyclic */ )
+                                  next
+                                    case STA_2
+                                    step( solve( (#vl.3, 0) ~~> (#vk.13, 0) ) )
+                                      case d_0_fst
+                                      by step( contradiction /* impossible chain */ )
+                                    next
+                                      case d_0_snd
+                                      by step( solve( (#vr.7, 0) ~~> (#vk.13, 0) ) )
+                                    qed
+                                  qed
+                                next
+                                  case pub
+                                  step( solve( !KU( 'AP_MAC' ) @ #vk.15 ) )
+                                    case coerce
+                                    step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.14 ) )
+                                      case AP_1
+                                      by step( contradiction /* impossible chain */ )
+                                    next
+                                      case AP_2
+                                      by step( contradiction /* impossible chain */ )
+                                    next
+                                      case Password_guess
+                                      by step( contradiction /* impossible chain */ )
+                                    next
+                                      case STA_1
+                                      by step( contradiction /* cyclic */ )
+                                    next
+                                      case STA_2
+                                      step( solve( (#vl.3, 0) ~~> (#vk.14, 0) ) )
+                                        case d_0_fst
+                                        by step( contradiction /* impossible chain */ )
+                                      next
+                                        case d_0_snd
+                                        by step( solve( (#vr.7, 0) ~~> (#vk.14, 0) ) )
+                                      qed
+                                    qed
+                                  next
+                                    case pub
+                                    step( solve( !KU( 'Pairwise_key_expansion' ) @ #vk.16 ) )
+                                      case coerce
+                                      step( solve( !KD( 'Pairwise_key_expansion' ) ▶₀ #vk.15 ) )
+                                        case AP_1
+                                        by step( contradiction /* impossible chain */ )
+                                      next
+                                        case AP_2
+                                        by step( contradiction /* impossible chain */ )
+                                      next
+                                        case Password_guess
+                                        by step( contradiction /* impossible chain */ )
+                                      next
+                                        case STA_1
+                                        by step( contradiction /* impossible chain */ )
+                                      next
+                                        case STA_2
+                                        step( solve( (#vl.3, 0) ~~> (#vk.15, 0) ) )
+                                          case d_0_fst
+                                          by step( contradiction /* impossible chain */ )
+                                        next
+                                          case d_0_snd
+                                          by step( solve( (#vr.7, 0) ~~> (#vk.15, 0) ) )
+                                        qed
+                                      qed
+                                    next
+                                      case pub
+                                      step( solve( !KU( 'SSID_length' ) @ #vk.17 ) )
+                                        case coerce
+                                        step( solve( !KD( 'SSID_length' ) ▶₀ #vk.16 ) )
+                                          case AP_1
+                                          by step( contradiction /* impossible chain */ )
+                                        next
+                                          case AP_2
+                                          by step( contradiction /* impossible chain */ )
+                                        next
+                                          case Password_guess
+                                          by step( contradiction /* impossible chain */ )
+                                        next
+                                          case STA_1
+                                          by step( contradiction /* impossible chain */ )
+                                        next
+                                          case STA_2
+                                          step( solve( (#vl.3, 0) ~~> (#vk.16, 0) ) )
+                                            case d_0_fst
+                                            by step( contradiction /* impossible chain */ )
+                                          next
+                                            case d_0_snd
+                                            by step( solve( (#vr.7, 0) ~~> (#vk.16, 0) ) )
+                                          qed
+                                        qed
+                                      next
+                                        case pub
+                                        step( solve( !KU( '4096' ) @ #vk.18 ) )
+                                          case coerce
+                                          step( solve( !KD( '4096' ) ▶₀ #vk.17 ) )
+                                            case AP_1
+                                            by step( contradiction /* impossible chain */ )
+                                          next
+                                            case AP_2
+                                            by step( contradiction /* impossible chain */ )
+                                          next
+                                            case Password_guess
+                                            by step( contradiction /* impossible chain */ )
+                                          next
+                                            case STA_1
+                                            by step( contradiction /* impossible chain */ )
+                                          next
+                                            case STA_2
+                                            step( solve( (#vl.3, 0) ~~> (#vk.17, 0) ) )
+                                              case d_0_fst
+                                              by step( contradiction /* impossible chain */ )
+                                            next
+                                              case d_0_snd
+                                              by step( solve( (#vr.7, 0) ~~> (#vk.17, 0) ) )
+                                            qed
+                                          qed
+                                        next
+                                          case pub
+                                          step( solve( !KU( 'STA_MAC' ) @ #vk.19 ) )
+                                            case coerce
+                                            step( solve( !KD( 'STA_MAC' ) ▶₀ #vk.18 ) )
+                                              case AP_1
+                                              by step( contradiction /* impossible chain */ )
+                                            next
+                                              case AP_2
+                                              by step( contradiction /* cyclic */ )
+                                            next
+                                              case Password_guess
+                                              by step( contradiction /* impossible chain */ )
+                                            next
+                                              case STA_1
+                                              by step( contradiction /* impossible chain */ )
+                                            next
+                                              case STA_2
+                                              step( solve( (#vl.3, 0) ~~> (#vk.18, 0) ) )
+                                                case d_0_fst
+                                                by step( contradiction /* impossible chain */ )
+                                              next
+                                                case d_0_snd
+                                                by step( solve( (#vr.7, 0) ~~> (#vk.18, 0) ) )
+                                              qed
+                                            qed
+                                          next
+                                            case pub
+                                            by ATTACK // trace found
+                                          qed
+                                        qed
+                                      qed
+                                    qed
+                                  qed
+                                qed
+                              qed
+                            qed
+                          qed
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !KD( x ) ▶₁ #i ) )
+      case AP_1
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case d_0_fst
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case Const_pub_SSID
+          step( solve( !Own( pw ) ▶₀ #vr ) )
+            case Password_init
+            step( solve( !KU( 'SSID' ) @ #vk ) )
+              case coerce
+              step( solve( !KD( 'SSID' ) ▶₀ #vk ) )
+                case AP_1
+                by step( contradiction /* impossible chain */ )
+              next
+                case AP_2
+                by step( contradiction /* impossible chain */ )
+              next
+                case Password_guess
+                by step( contradiction /* impossible chain */ )
+              next
+                case STA_1
+                by step( contradiction /* cyclic */ )
+              next
+                case STA_2
+                step( solve( (#vl.1, 0) ~~> (#vk, 0) ) )
+                  case d_0_fst
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case d_0_snd
+                  by step( solve( (#vr.4, 0) ~~> (#vk, 0) ) )
+                qed
+              qed
+            next
+              case pub
+              MIRRORED
+            qed
+          qed
+        qed
+      next
+        case d_0_snd
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case Const_pub_AP_MAC
+          step( solve( !Own( pw ) ▶₀ #vr ) )
+            case Password_init
+            step( solve( !KU( 'AP_MAC' ) @ #vk ) )
+              case coerce
+              step( solve( !KD( 'AP_MAC' ) ▶₀ #vk ) )
+                case AP_1
+                by step( contradiction /* impossible chain */ )
+              next
+                case AP_2
+                by step( contradiction /* impossible chain */ )
+              next
+                case Password_guess
+                by step( contradiction /* impossible chain */ )
+              next
+                case STA_1
+                by step( contradiction /* cyclic */ )
+              next
+                case STA_2
+                step( solve( (#vl.1, 0) ~~> (#vk, 0) ) )
+                  case d_0_fst
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case d_0_snd
+                  by step( solve( (#vr.4, 0) ~~> (#vk, 0) ) )
+                qed
+              qed
+            next
+              case pub
+              MIRRORED
+            qed
+          qed
+        qed
+      next
+        case pair
+        step( solve( !Own( pw ) ▶₀ #vr ) )
+          case Password_init
+          step( solve( !KU( 'SSID' ) @ #vk.1 ) )
+            case coerce
+            step( solve( !KD( 'SSID' ) ▶₀ #vk.1 ) )
+              case AP_1
+              by step( contradiction /* impossible chain */ )
+            next
+              case AP_2
+              by step( contradiction /* impossible chain */ )
+            next
+              case Password_guess
+              by step( contradiction /* impossible chain */ )
+            next
+              case STA_1
+              by step( contradiction /* cyclic */ )
+            next
+              case STA_2
+              step( solve( (#vl.1, 0) ~~> (#vk.1, 0) ) )
+                case d_0_fst
+                by step( contradiction /* impossible chain */ )
+              next
+                case d_0_snd
+                by step( solve( (#vr.3, 0) ~~> (#vk.1, 0) ) )
+              qed
+            qed
+          next
+            case pub
+            step( solve( !KU( 'AP_MAC' ) @ #vk.2 ) )
+              case coerce
+              step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.2 ) )
+                case AP_1
+                by step( contradiction /* impossible chain */ )
+              next
+                case AP_2
+                by step( contradiction /* impossible chain */ )
+              next
+                case Password_guess
+                by step( contradiction /* impossible chain */ )
+              next
+                case STA_1
+                by step( contradiction /* cyclic */ )
+              next
+                case STA_2
+                step( solve( (#vl.1, 0) ~~> (#vk.2, 0) ) )
+                  case d_0_fst
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case d_0_snd
+                  by step( solve( (#vr.3, 0) ~~> (#vk.2, 0) ) )
+                qed
+              qed
+            next
+              case pub
+              MIRRORED
+            qed
+          qed
+        qed
+      qed
+    next
+      case AP_2
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case Var_fresh_ANonce
+        step( solve( AP_state_1( pw ) ▶₀ #vr ) )
+          case AP_1
+          step( solve( !KU( ~ANonce ) @ #vk.1 ) )
+            case AP_2
+            step( solve( !KU( 'STA_MAC' ) @ #vk.3 ) )
+              case coerce
+              step( solve( !KD( 'STA_MAC' ) ▶₀ #vk.2 ) )
+                case AP_1
+                by step( contradiction /* impossible chain */ )
+              next
+                case AP_2
+                by step( contradiction /* cyclic */ )
+              next
+                case Password_guess
+                by step( contradiction /* impossible chain */ )
+              next
+                case STA_1
+                by step( contradiction /* impossible chain */ )
+              next
+                case STA_2
+                step( solve( (#vl.1, 0) ~~> (#vk.2, 0) ) )
+                  case d_0_fst
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case d_0_snd
+                  by step( solve( (#vr.4, 0) ~~> (#vk.2, 0) ) )
+                qed
+              qed
+            next
+              case pub
+              MIRRORED
+            qed
+          qed
+        qed
+      qed
+    next
+      case Password_guess
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case Var_fresh_rc
+        step( solve( !Own( pw ) ▶₀ #vr ) )
+          case Password_init
+          step( solve( !KU( ~rc ) @ #vk ) )
+            case Password_guess
+            MIRRORED
+          qed
+        qed
+      qed
+    next
+      case STA_1
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case d_0_fst
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case Var_fresh_SNonce
+          step( solve( !Own( pw ) ▶₀ #vr ) )
+            case Password_init
+            step( solve( !KU( ~SNonce ) @ #vk.1 ) )
+              case STA_1
+              step( solve( !KU( 'SSID' ) @ #vk.2 ) )
+                case coerce
+                step( solve( !KD( 'SSID' ) ▶₀ #vk.2 ) )
+                  case AP_1
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case AP_2
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case Password_guess
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case STA_1
+                  by step( contradiction /* cyclic */ )
+                next
+                  case STA_2
+                  step( solve( (#vl.1, 0) ~~> (#vk.2, 0) ) )
+                    case d_0_fst
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case d_0_snd
+                    by step( solve( (#vr.5, 0) ~~> (#vk.2, 0) ) )
+                  qed
+                qed
+              next
+                case pub
+                step( solve( !KU( 'AP_MAC' ) @ #vk.3 ) )
+                  case coerce
+                  step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.3 ) )
+                    case AP_1
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case AP_2
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case Password_guess
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case STA_1
+                    by step( contradiction /* cyclic */ )
+                  next
+                    case STA_2
+                    step( solve( (#vl.1, 0) ~~> (#vk.3, 0) ) )
+                      case d_0_fst
+                      by step( contradiction /* impossible chain */ )
+                    next
+                      case d_0_snd
+                      by step( solve( (#vr.5, 0) ~~> (#vk.3, 0) ) )
+                    qed
+                  qed
+                next
+                  case pub
+                  MIRRORED
+                qed
+              qed
+            qed
+          qed
+        qed
+      next
+        case d_0_snd
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case Const_pub_STA_MAC
+          step( solve( !Own( pw ) ▶₀ #vr ) )
+            case Password_init
+            step( solve( !KU( 'SSID' ) @ #vk.2 ) )
+              case coerce
+              step( solve( !KD( 'SSID' ) ▶₀ #vk.1 ) )
+                case AP_1
+                by step( contradiction /* impossible chain */ )
+              next
+                case AP_2
+                by step( contradiction /* impossible chain */ )
+              next
+                case Password_guess
+                by step( contradiction /* impossible chain */ )
+              next
+                case STA_1
+                by step( contradiction /* cyclic */ )
+              next
+                case STA_2
+                step( solve( (#vl.1, 0) ~~> (#vk.1, 0) ) )
+                  case d_0_fst
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case d_0_snd
+                  by step( solve( (#vr.4, 0) ~~> (#vk.1, 0) ) )
+                qed
+              qed
+            next
+              case pub
+              step( solve( !KU( 'AP_MAC' ) @ #vk.3 ) )
+                case coerce
+                step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.2 ) )
+                  case AP_1
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case AP_2
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case Password_guess
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case STA_1
+                  by step( contradiction /* cyclic */ )
+                next
+                  case STA_2
+                  step( solve( (#vl.1, 0) ~~> (#vk.2, 0) ) )
+                    case d_0_fst
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case d_0_snd
+                    by step( solve( (#vr.4, 0) ~~> (#vk.2, 0) ) )
+                  qed
+                qed
+              next
+                case pub
+                step( solve( !KU( 'STA_MAC' ) @ #vk.3 ) )
+                  case coerce
+                  step( solve( !KD( 'STA_MAC' ) ▶₀ #vk.3 ) )
+                    case AP_1
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case AP_2
+                    by step( contradiction /* cyclic */ )
+                  next
+                    case Password_guess
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case STA_1
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case STA_2
+                    step( solve( (#vl.1, 0) ~~> (#vk.3, 0) ) )
+                      case d_0_fst
+                      by step( contradiction /* impossible chain */ )
+                    next
+                      case d_0_snd
+                      by step( solve( (#vr.4, 0) ~~> (#vk.3, 0) ) )
+                    qed
+                  qed
+                next
+                  case pub
+                  MIRRORED
+                qed
+              qed
+            qed
+          qed
+        qed
+      next
+        case pair
+        step( solve( !Own( pw ) ▶₀ #vr ) )
+          case Password_init
+          step( solve( !KU( ~SNonce ) @ #vk.4 ) )
+            case STA_1
+            step( solve( !KU( 'SSID' ) @ #vk.3 ) )
+              case coerce
+              step( solve( !KD( 'SSID' ) ▶₀ #vk.3 ) )
+                case AP_1
+                by step( contradiction /* impossible chain */ )
+              next
+                case AP_2
+                by step( contradiction /* impossible chain */ )
+              next
+                case Password_guess
+                by step( contradiction /* impossible chain */ )
+              next
+                case STA_1
+                by step( contradiction /* cyclic */ )
+              next
+                case STA_2
+                step( solve( (#vl.1, 0) ~~> (#vk.3, 0) ) )
+                  case d_0_fst
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case d_0_snd
+                  by step( solve( (#vr.4, 0) ~~> (#vk.3, 0) ) )
+                qed
+              qed
+            next
+              case pub
+              step( solve( !KU( 'AP_MAC' ) @ #vk.4 ) )
+                case coerce
+                step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.4 ) )
+                  case AP_1
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case AP_2
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case Password_guess
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case STA_1
+                  by step( contradiction /* cyclic */ )
+                next
+                  case STA_2
+                  step( solve( (#vl.1, 0) ~~> (#vk.4, 0) ) )
+                    case d_0_fst
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case d_0_snd
+                    by step( solve( (#vr.4, 0) ~~> (#vk.4, 0) ) )
+                  qed
+                qed
+              next
+                case pub
+                step( solve( !KU( 'STA_MAC' ) @ #vk.5 ) )
+                  case coerce
+                  step( solve( !KD( 'STA_MAC' ) ▶₀ #vk.5 ) )
+                    case AP_1
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case AP_2
+                    by step( contradiction /* cyclic */ )
+                  next
+                    case Password_guess
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case STA_1
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case STA_2
+                    step( solve( (#vl.1, 0) ~~> (#vk.5, 0) ) )
+                      case d_0_fst
+                      by step( contradiction /* impossible chain */ )
+                    next
+                      case d_0_snd
+                      by step( solve( (#vr.4, 0) ~~> (#vk.5, 0) ) )
+                    qed
+                  qed
+                next
+                  case pub
+                  MIRRORED
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    next
+      case STA_2
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case d_0_fst
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case Var_fresh_data
+          step( solve( STA_state_1( pw, SNonce ) ▶₀ #vr ) )
+            case STA_1
+            step( solve( !KU( ~data ) @ #vk.1 ) )
+              case STA_2
+              step( solve( !KU( 'SSID' ) @ #vk.3 ) )
+                case coerce
+                step( solve( !KD( 'SSID' ) ▶₀ #vk.2 ) )
+                  case AP_1
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case AP_2
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case Password_guess
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case STA_1
+                  by step( contradiction /* cyclic */ )
+                next
+                  case STA_2
+                  step( solve( (#vl.1, 0) ~~> (#vk.2, 0) ) )
+                    case d_0_fst
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case d_0_snd
+                    by step( solve( (#vr.6, 0) ~~> (#vk.2, 0) ) )
+                  qed
+                qed
+              next
+                case pub
+                step( solve( !KU( 'AP_MAC' ) @ #vk.4 ) )
+                  case coerce
+                  step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.3 ) )
+                    case AP_1
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case AP_2
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case Password_guess
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case STA_1
+                    by step( contradiction /* cyclic */ )
+                  next
+                    case STA_2
+                    step( solve( (#vl.1, 0) ~~> (#vk.3, 0) ) )
+                      case d_0_fst
+                      by step( contradiction /* impossible chain */ )
+                    next
+                      case d_0_snd
+                      by step( solve( (#vr.6, 0) ~~> (#vk.3, 0) ) )
+                    qed
+                  qed
+                next
+                  case pub
+                  MIRRORED
+                qed
+              qed
+            qed
+          qed
+        qed
+      next
+        case d_0_snd
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case HMAC_MD5
+          step( solve( STA_state_1( pw, SNonce ) ▶₀ #vr ) )
+            case STA_1
+            step( solve( !KU( HMAC_MD5(SHA1_PRF(pdkdf2_SHA1(~pw, 'SSID',
+                                                            'SSID_length', '4096'),
+                                                Len(pdkdf2_SHA1(~pw, 'SSID', 'SSID_length', '4096')),
+                                                'Pairwise_key_expansion', Min('AP_MAC', 'STA_MAC'),
+                                                Max('AP_MAC', 'STA_MAC'), Min(ANonce, ~SNonce),
+                                                Max(ANonce, ~SNonce)),
+                                       ~data)
+                         ) @ #vk.1 ) )
+              case STA_2
+              step( solve( !KU( 'SSID' ) @ #vk.3 ) )
+                case coerce
+                step( solve( !KD( 'SSID' ) ▶₀ #vk.2 ) )
+                  case AP_1
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case AP_2
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case Password_guess
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case STA_1
+                  by step( contradiction /* cyclic */ )
+                next
+                  case STA_2
+                  step( solve( (#vl.1, 0) ~~> (#vk.2, 0) ) )
+                    case d_0_fst
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case d_0_snd
+                    by step( solve( (#vr.6, 0) ~~> (#vk.2, 0) ) )
+                  qed
+                qed
+              next
+                case pub
+                step( solve( !KU( 'AP_MAC' ) @ #vk.4 ) )
+                  case coerce
+                  step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.3 ) )
+                    case AP_1
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case AP_2
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case Password_guess
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case STA_1
+                    by step( contradiction /* cyclic */ )
+                  next
+                    case STA_2
+                    step( solve( (#vl.1, 0) ~~> (#vk.3, 0) ) )
+                      case d_0_fst
+                      by step( contradiction /* impossible chain */ )
+                    next
+                      case d_0_snd
+                      by step( solve( (#vr.6, 0) ~~> (#vk.3, 0) ) )
+                    qed
+                  qed
+                next
+                  case pub
+                  MIRRORED
+                qed
+              qed
+            next
+              case c_HMAC_MD5
+              step( solve( !KU( SHA1_PRF(pdkdf2_SHA1(~pw, 'SSID', 'SSID_length',
+                                                     '4096'),
+                                         Len(pdkdf2_SHA1(~pw, 'SSID', 'SSID_length', '4096')),
+                                         'Pairwise_key_expansion', Min('AP_MAC', 'STA_MAC'),
+                                         Max('AP_MAC', 'STA_MAC'), Min(ANonce, ~SNonce), Max(ANonce, ~SNonce))
+                           ) @ #vk.5 ) )
+                case c_SHA1_PRF
+                step( solve( !KU( pdkdf2_SHA1(~pw, 'SSID', 'SSID_length', '4096')
+                             ) @ #vk.7 ) )
+                  case c_pdkdf2_SHA1
+                  by step( solve( !KU( ~pw ) @ #vk.14 ) )
+                qed
+              qed
+            qed
+          qed
+        qed
+      next
+        case pair
+        step( solve( STA_state_1( pw, SNonce ) ▶₀ #vr ) )
+          case STA_1
+          step( solve( !KU( ~data ) @ #vk.3 ) )
+            case STA_2
+            step( solve( !KU( HMAC_MD5(SHA1_PRF(pdkdf2_SHA1(~pw, 'SSID',
+                                                            'SSID_length', '4096'),
+                                                Len(pdkdf2_SHA1(~pw, 'SSID', 'SSID_length', '4096')),
+                                                'Pairwise_key_expansion', Min('AP_MAC', 'STA_MAC'),
+                                                Max('AP_MAC', 'STA_MAC'), Min(ANonce, ~SNonce),
+                                                Max(ANonce, ~SNonce)),
+                                       ~data)
+                         ) @ #vk.4 ) )
+              case STA_2
+              step( solve( !KU( 'SSID' ) @ #vk.5 ) )
+                case coerce
+                step( solve( !KD( 'SSID' ) ▶₀ #vk.4 ) )
+                  case AP_1
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case AP_2
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case Password_guess
+                  by step( contradiction /* impossible chain */ )
+                next
+                  case STA_1
+                  by step( contradiction /* cyclic */ )
+                next
+                  case STA_2
+                  step( solve( (#vl.1, 0) ~~> (#vk.4, 0) ) )
+                    case d_0_fst
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case d_0_snd
+                    by step( solve( (#vr.6, 0) ~~> (#vk.4, 0) ) )
+                  qed
+                qed
+              next
+                case pub
+                step( solve( !KU( 'AP_MAC' ) @ #vk.6 ) )
+                  case coerce
+                  step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.5 ) )
+                    case AP_1
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case AP_2
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case Password_guess
+                    by step( contradiction /* impossible chain */ )
+                  next
+                    case STA_1
+                    by step( contradiction /* cyclic */ )
+                  next
+                    case STA_2
+                    step( solve( (#vl.1, 0) ~~> (#vk.5, 0) ) )
+                      case d_0_fst
+                      by step( contradiction /* impossible chain */ )
+                    next
+                      case d_0_snd
+                      by step( solve( (#vr.6, 0) ~~> (#vk.5, 0) ) )
+                    qed
+                  qed
+                next
+                  case pub
+                  MIRRORED
+                qed
+              qed
+            next
+              case c_HMAC_MD5
+              step( solve( !KU( SHA1_PRF(pdkdf2_SHA1(~pw, 'SSID', 'SSID_length',
+                                                     '4096'),
+                                         Len(pdkdf2_SHA1(~pw, 'SSID', 'SSID_length', '4096')),
+                                         'Pairwise_key_expansion', Min('AP_MAC', 'STA_MAC'),
+                                         Max('AP_MAC', 'STA_MAC'), Min(ANonce, ~SNonce), Max(ANonce, ~SNonce))
+                           ) @ #vk.7 ) )
+                case c_SHA1_PRF
+                step( solve( !KU( pdkdf2_SHA1(~pw, 'SSID', 'SSID_length', '4096')
+                             ) @ #vk.8 ) )
+                  case c_pdkdf2_SHA1
+                  by step( solve( !KU( ~pw ) @ #vk.15 ) )
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+next
+  case Rule_Password_guess
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !Own( pw ) ▶₀ #i ) )
+      case Password_init
+      MIRRORED
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !Own( pw ) ▶₀ #i ) )
+      case Password_init
+      MIRRORED
+    qed
+  qed
+next
+  case Rule_Password_init
+  backward-search
+    case LHS
+    step( simplify )
+    MIRRORED
+  next
+    case RHS
+    step( simplify )
+    MIRRORED
+  qed
+next
+  case Rule_STA_1
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !Own( pw ) ▶₀ #i ) )
+      case Password_init
+      step( solve( !KU( 'SSID' ) @ #vk.1 ) )
+        case coerce
+        step( solve( !KD( 'SSID' ) ▶₀ #vk.1 ) )
+          case AP_1
+          by step( contradiction /* impossible chain */ )
+        next
+          case AP_2
+          by step( contradiction /* impossible chain */ )
+        next
+          case Password_guess
+          step( solve( !Own( t ) ▶₀ #vr.1 ) )
+            case Password_init
+            by step( contradiction /* impossible chain */ )
+          qed
+        next
+          case STA_1
+          by step( contradiction /* cyclic */ )
+        next
+          case STA_2
+          step( solve( (#vl, 0) ~~> (#vk.1, 0) ) )
+            case d_0_fst
+            by step( contradiction /* impossible chain */ )
+          next
+            case d_0_snd
+            by step( solve( (#vr.2, 0) ~~> (#vk.1, 0) ) )
+          qed
+        qed
+      next
+        case pub
+        step( solve( !KU( 'AP_MAC' ) @ #vk.2 ) )
+          case coerce
+          step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.2 ) )
+            case AP_1
+            by step( contradiction /* impossible chain */ )
+          next
+            case AP_2
+            by step( contradiction /* impossible chain */ )
+          next
+            case Password_guess
+            step( solve( !Own( t ) ▶₀ #vr.1 ) )
+              case Password_init
+              by step( contradiction /* impossible chain */ )
+            qed
+          next
+            case STA_1
+            by step( contradiction /* cyclic */ )
+          next
+            case STA_2
+            step( solve( (#vl, 0) ~~> (#vk.2, 0) ) )
+              case d_0_fst
+              by step( contradiction /* impossible chain */ )
+            next
+              case d_0_snd
+              by step( solve( (#vr.2, 0) ~~> (#vk.2, 0) ) )
+            qed
+          qed
+        next
+          case pub
+          MIRRORED
+        qed
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !Own( pw ) ▶₀ #i ) )
+      case Password_init
+      step( solve( !KU( 'SSID' ) @ #vk.1 ) )
+        case coerce
+        step( solve( !KD( 'SSID' ) ▶₀ #vk.1 ) )
+          case AP_1
+          by step( contradiction /* impossible chain */ )
+        next
+          case AP_2
+          by step( contradiction /* impossible chain */ )
+        next
+          case Password_guess
+          by step( contradiction /* impossible chain */ )
+        next
+          case STA_1
+          by step( contradiction /* cyclic */ )
+        next
+          case STA_2
+          step( solve( (#vl, 0) ~~> (#vk.1, 0) ) )
+            case d_0_fst
+            by step( contradiction /* impossible chain */ )
+          next
+            case d_0_snd
+            by step( solve( (#vr.2, 0) ~~> (#vk.1, 0) ) )
+          qed
+        qed
+      next
+        case pub
+        step( solve( !KU( 'AP_MAC' ) @ #vk.2 ) )
+          case coerce
+          step( solve( !KD( 'AP_MAC' ) ▶₀ #vk.2 ) )
+            case AP_1
+            by step( contradiction /* impossible chain */ )
+          next
+            case AP_2
+            by step( contradiction /* impossible chain */ )
+          next
+            case Password_guess
+            by step( contradiction /* impossible chain */ )
+          next
+            case STA_1
+            by step( contradiction /* cyclic */ )
+          next
+            case STA_2
+            step( solve( (#vl, 0) ~~> (#vk.2, 0) ) )
+              case d_0_fst
+              by step( contradiction /* impossible chain */ )
+            next
+              case d_0_snd
+              by step( solve( (#vr.2, 0) ~~> (#vk.2, 0) ) )
+            qed
+          qed
+        next
+          case pub
+          MIRRORED
+        qed
+      qed
+    qed
+  qed
+next
+  case Rule_STA_2
+  backward-search
+    case LHS
+    step( simplify )
+    MIRRORED
+  next
+    case RHS
+    step( simplify )
+    MIRRORED
+  qed
+next
+  case Rule_Send
+  backward-search
+    case LHS
+    step( simplify )
+    MIRRORED
+  next
+    case RHS
+    step( simplify )
+    MIRRORED
+  qed
+qed
+
+end

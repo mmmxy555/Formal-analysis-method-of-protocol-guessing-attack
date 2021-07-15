@@ -1,0 +1,422 @@
+theory Maitra begin
+
+// Function signature and definition of the equational theory E
+
+builtins: xor
+functions: Hbio/1, fst/1, h/1, pair/2, snd/1
+equations: fst(<x.1, x.2>) = x.1, snd(<x.1, x.2>) = x.2
+
+
+
+rule (modulo E) User_init:
+   [ Fr( ~ID ), Fr( ~PW ) ]
+  --[ Init_once( 'User' ) ]->
+   [ !Own_User( ~ID, ~PW ) ]
+
+rule (modulo E) Server_init:
+   [ Fr( ~x ) ] --[ Init_once( 'Server' ) ]-> [ Own_server( ~x ) ]
+
+rule (modulo E) Regist_User:
+   [ !Own_User( ID, PW ) ]
+  -->
+   [ Out_S1( $User, $Server, <ID, PW> ), User_state1( ID, PW ) ]
+
+rule (modulo E) Regist_Server:
+   [ Own_server( x ), Out_S1( $User, $Server, <ID, PW> ), Fr( ~ns ) ]
+  -->
+   [
+   Out_S2( $Server, $User,
+           <(h(<ID, h(x)>)⊕h(<PW, ~ns>)), h(<h(<ID, h(x)>), h(<PW, ~ns>)>), 
+            (~ns⊕h(<ID, PW>))>
+   ),
+   Server_state1( x, h(h(h(<ID, h(x)>))) )
+   ]
+
+rule (modulo E) User_Login:
+   [ Out_S2( $Server, $User, <L, B, n> ), User_state1( ID, PW ) ]
+  --[
+  Eq( h(<(L⊕h(<PW, (n⊕h(<ID, PW>))>)), h(<PW, (n⊕h(<ID, PW>))>)>), B ),
+  Finish( ID, PW, <L, B, n> )
+  ]->
+   [ Out_S3( $User, $SC, <L, B, n> ), User_state2( ID, PW, <L, B, n> ) ]
+
+rule (modulo E) Password_guess:
+   [ !Own_User( ID, PW ), Fr( ~x ), Fr( ~y ) ]
+  --[ Init_once( 'Guess' ) ]->
+   [ Out( diff(<ID, PW>, <~x, ~y>) ) ]
+
+restriction unique_init [right]:
+  "∀ #i #j name.
+    ((Init_once( name ) @ #i) ∧ (Init_once( name ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction unique_init [left]:
+  "∀ #i #j name.
+    ((Init_once( name ) @ #i) ∧ (Init_once( name ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction Verif [right]:
+  "∀ x y #i. (Eq( x, y ) @ #i) ⇒ (x = y)"
+  // safety formula
+
+restriction Verif [left]:
+  "∀ x y #i. (Eq( x, y ) @ #i) ⇒ (x = y)"
+  // safety formula
+
+/* All well-formedness checks were successful. */
+
+diffLemma Observational_equivalence:
+rule-equivalence
+  case Rule_Destrd_0_fst
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !KD( <x, x.1> ) ▶₀ #i ) )
+      case Password_guess
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        step( solve( !Own_User( ID, PW ) ▶₀ #vr ) )
+          case User_init
+          by step( contradiction /* impossible chain */ )
+        qed
+      next
+        case d_0_snd
+        step( solve( !Own_User( ID, PW ) ▶₀ #vr ) )
+          case User_init
+          by step( contradiction /* impossible chain */ )
+        qed
+      next
+        case pair
+        step( solve( !Own_User( ID, PW ) ▶₀ #vr ) )
+          case User_init
+          MIRRORED
+        qed
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !KD( <x, x.1> ) ▶₀ #i ) )
+      case Password_guess
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( contradiction /* impossible chain */ )
+      next
+        case pair
+        step( solve( !Own_User( ID, PW ) ▶₀ #vr ) )
+          case User_init
+          MIRRORED
+        qed
+      qed
+    qed
+  qed
+next
+  case Rule_Destrd_0_snd
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !KD( <x, x.1> ) ▶₀ #i ) )
+      case Password_guess
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        step( solve( !Own_User( ID, PW ) ▶₀ #vr ) )
+          case User_init
+          by step( contradiction /* impossible chain */ )
+        qed
+      next
+        case d_0_snd
+        step( solve( !Own_User( ID, PW ) ▶₀ #vr ) )
+          case User_init
+          by step( contradiction /* impossible chain */ )
+        qed
+      next
+        case pair
+        step( solve( !Own_User( ID, PW ) ▶₀ #vr ) )
+          case User_init
+          MIRRORED
+        qed
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !KD( <x, x.1> ) ▶₀ #i ) )
+      case Password_guess
+      step( solve( (#vl, 0) ~~> (#i, 0) ) )
+        case d_0_fst
+        by step( contradiction /* impossible chain */ )
+      next
+        case d_0_snd
+        by step( contradiction /* impossible chain */ )
+      next
+        case pair
+        step( solve( !Own_User( ID, PW ) ▶₀ #vr ) )
+          case User_init
+          MIRRORED
+        qed
+      qed
+    qed
+  qed
+next
+  case Rule_Destrd_xor
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( DiffIntrDestrd_xor( ) @ #i ) )
+      case d_xor_case_1
+      step( solve( !KD( (x⊕y) ) ▶₀ #i ) )
+        case Password_guess
+        step( solve( (#vl, 0) ~~> (#i, 0) ) )
+          case d_0_fst
+          step( solve( !Own_User( ID, PW ) ▶₀ #vr ) )
+            case User_init
+            by step( contradiction /* impossible chain */ )
+          qed
+        next
+          case d_0_snd
+          step( solve( !Own_User( ID, PW ) ▶₀ #vr ) )
+            case User_init
+            by step( contradiction /* impossible chain */ )
+          qed
+        qed
+      qed
+    next
+      case d_xor_case_2
+      step( solve( !KD( (x⊕y) ) ▶₀ #i ) )
+        case Password_guess
+        step( solve( (#vl, 0) ~~> (#i, 0) ) )
+          case d_0_fst
+          step( solve( !Own_User( ID, PW ) ▶₀ #vr ) )
+            case User_init
+            by step( contradiction /* impossible chain */ )
+          qed
+        next
+          case d_0_snd
+          step( solve( !Own_User( ID, PW ) ▶₀ #vr ) )
+            case User_init
+            by step( contradiction /* impossible chain */ )
+          qed
+        qed
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( DiffIntrDestrd_xor( ) @ #i ) )
+      case d_xor_case_1
+      step( solve( !KD( (x⊕y) ) ▶₀ #i ) )
+        case Password_guess
+        by step( contradiction /* impossible chain */ )
+      qed
+    next
+      case d_xor_case_2
+      step( solve( !KD( (x⊕y) ) ▶₀ #i ) )
+        case Password_guess
+        by step( contradiction /* impossible chain */ )
+      qed
+    qed
+  qed
+next
+  case Rule_Equality
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !KD( x ) ▶₁ #i ) )
+      case Password_guess
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case d_0_fst
+        step( solve( !Own_User( ID, PW ) ▶₀ #vr ) )
+          case User_init
+          step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+            case Var_fresh_ID
+            step( solve( !KU( ~ID ) @ #vk ) )
+              case Password_guess
+              MIRRORED
+            qed
+          qed
+        qed
+      next
+        case d_0_snd
+        step( solve( !Own_User( ID, PW ) ▶₀ #vr ) )
+          case User_init
+          step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+            case Var_fresh_PW
+            step( solve( !KU( ~PW ) @ #vk ) )
+              case Password_guess
+              MIRRORED
+            qed
+          qed
+        qed
+      next
+        case pair
+        step( solve( !Own_User( ID, PW ) ▶₀ #vr ) )
+          case User_init
+          step( solve( !KU( ~ID ) @ #vk.1 ) )
+            case Password_guess
+            step( solve( !KU( ~PW ) @ #vk.2 ) )
+              case Password_guess
+              MIRRORED
+            qed
+          qed
+        qed
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !KD( x ) ▶₁ #i ) )
+      case Password_guess
+      step( solve( (#vl, 0) ~~> (#i, 1) ) )
+        case d_0_fst
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case Var_fresh_1_x
+          step( solve( !Own_User( ID, PW ) ▶₀ #vr ) )
+            case User_init
+            step( solve( !KU( ~x ) @ #vk ) )
+              case Password_guess
+              MIRRORED
+            qed
+          qed
+        qed
+      next
+        case d_0_snd
+        step( solve( (#vr.1, 0) ~~> (#i, 1) ) )
+          case Var_fresh_y
+          step( solve( !Own_User( ID, PW ) ▶₀ #vr ) )
+            case User_init
+            step( solve( !KU( ~y ) @ #vk ) )
+              case Password_guess
+              MIRRORED
+            qed
+          qed
+        qed
+      next
+        case pair
+        step( solve( !Own_User( ID, PW ) ▶₀ #vr ) )
+          case User_init
+          step( solve( !KU( ~x ) @ #vk.1 ) )
+            case Password_guess
+            step( solve( !KU( ~y ) @ #vk.2 ) )
+              case Password_guess
+              MIRRORED
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+next
+  case Rule_Password_guess
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( !Own_User( ID, PW ) ▶₀ #i ) )
+      case User_init
+      MIRRORED
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( !Own_User( ID, PW ) ▶₀ #i ) )
+      case User_init
+      MIRRORED
+    qed
+  qed
+next
+  case Rule_Regist_Server
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( Own_server( x ) ▶₀ #i ) )
+      case Server_init
+      step( solve( Out_S1( $User, $Server, <ID, PW> ) ▶₁ #i ) )
+        case Regist_User
+        MIRRORED
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( Own_server( x ) ▶₀ #i ) )
+      case Server_init
+      step( solve( Out_S1( $User, $Server, <ID, PW> ) ▶₁ #i ) )
+        case Regist_User
+        MIRRORED
+      qed
+    qed
+  qed
+next
+  case Rule_Regist_User
+  backward-search
+    case LHS
+    step( simplify )
+    MIRRORED
+  next
+    case RHS
+    step( simplify )
+    MIRRORED
+  qed
+next
+  case Rule_Send
+  backward-search
+    case LHS
+    step( simplify )
+    MIRRORED
+  next
+    case RHS
+    step( simplify )
+    MIRRORED
+  qed
+next
+  case Rule_Server_init
+  backward-search
+    case LHS
+    step( simplify )
+    MIRRORED
+  next
+    case RHS
+    step( simplify )
+    MIRRORED
+  qed
+next
+  case Rule_User_Login
+  backward-search
+    case LHS
+    step( simplify )
+    step( solve( Out_S2( $Server, $User, <L, h(<z, h(<PW, z.1>)>), n>
+                 ) ▶₀ #i ) )
+      case Regist_Server
+      step( solve( User_state1( ~ID, ~PW ) ▶₁ #i ) )
+        case Regist_User
+        MIRRORED
+      qed
+    qed
+  next
+    case RHS
+    step( simplify )
+    step( solve( Out_S2( $Server, $User, <L, h(<z, h(<PW, z.1>)>), n>
+                 ) ▶₀ #i ) )
+      case Regist_Server
+      step( solve( User_state1( ~ID, ~PW ) ▶₁ #i ) )
+        case Regist_User
+        MIRRORED
+      qed
+    qed
+  qed
+next
+  case Rule_User_init
+  backward-search
+    case LHS
+    step( simplify )
+    MIRRORED
+  next
+    case RHS
+    step( simplify )
+    MIRRORED
+  qed
+qed
+
+end

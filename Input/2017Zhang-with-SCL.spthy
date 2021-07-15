@@ -1,0 +1,67 @@
+theory Zhang
+begin
+builtins: hashing, xor
+functions: Hbio/1
+
+
+
+rule User_init:
+    [ Fr(~ID),Fr(~PW),Fr(~B) ]
+  --[ Init_pw_once() ]->
+    [ !Own_User(~ID,~PW,~B) ]
+
+rule Server_init:
+    [ Fr(~s),Fr(~IDsc) ]
+  --[ Init_once('Server') ]->
+    [ Own_server(~s,~IDsc) ]
+rule Regist_smartcard:
+  let
+    C1=h(ID,PW,Hbio(B))
+    C2=B⊕~r1
+    M=h(<Hbio(C2),s>)
+    W=h(Hbio(<C2,~r2>))
+    X=h(<IDsc,C1,M>)⊕~r2
+    Y=M⊕C1
+    Z=~r1⊕Hbio(B)
+    SmartCard=<IDsc,X,Y,Z>
+  in
+    [ !Own_User(ID,PW,B),Own_server(s,IDsc), Fr(~r1),Fr(~r2) ]
+  --[ Init_once('1') ]->
+    [ Out(SmartCard),Out(<ID,B>),Regist(SmartCard,ID,PW,B,~r1,~r2) ]
+
+
+rule A_User_Login:
+  let
+    SmartCard=<IDsc,X,Y,Z>
+    C3=h(B,r1,r2)
+  in
+    [ Regist(SmartCard,ID,PW,B,r1,r2)]
+  --[ Finish(ID,PW,B),Init_once('3') ]->
+    [ Out(C3),User_state3(ID,PW,B,r1,<IDsc,X,Y,Z>,C3)]
+
+
+
+rule Password_guess:
+    [ !Own_User(ID,PW,B),Fr(~rpw)]
+  --[ Guess_once() ]->
+    [ Out(diff(PW,~rpw)) ]
+
+
+
+restriction Init:
+" 
+   All #i #j. Init_pw_once()@i & Init_pw_once()@j ==> #i=#j
+"
+restriction guess:
+" 
+   All #i #j. Guess_once()@i & Guess_once()@j ==> #i=#j
+"
+
+restriction unique_init:
+"
+    All #i #j name. Init_once(name) @i & Init_once(name) @j ==> #i =#j
+"
+
+
+
+end
